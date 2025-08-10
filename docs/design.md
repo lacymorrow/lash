@@ -1,56 +1,60 @@
 ## Lash: Design (Fork of Charmbracelet Crush)
 
 ### Overview
-Lash is a login-shell-friendly fork of Charmbracelet Crush that adds Shell and Auto modes while preserving Crush’s Agent mode and built-in Model Context Protocol (MCP) support. It runs headless in any Unix terminal (including over SSH), launches in the previously selected mode (persisted across sessions) and defaults to Auto on first run, and exposes a minimal statusline showing the active mode: Shell, Agent, or Auto.
+Lash is a login-shell-friendly fork of Charmbracelet Crush that behaves as a natural shell with optional AI assist. It always runs the user’s real shell in a PTY, preserving history, tab completion, and full TTY features. Natural language is handled by the agent only when a command would otherwise fail (command not found), or when explicitly invoked via a hotkey/prefix. The visual experience is uniform: one terminal with a minimal statusline and a tiny confirmation panel when needed.
 
 Reference: [charmbracelet/crush](https://github.com/charmbracelet/crush)
 
 ### Goals
 - Mandatory MCP: reuse Crush’s native MCP support (stdio/http/SSE) and configuration.
-- Shell-like UX: provide a real shell in a PTY; behave like a typical login shell.
-- Headless + SSH-safe: no GUI; operates inside SSH sessions; safe non-interactive behavior.
-- Minimal UI: single-row statusline and a small confirmation panel for agent-suggested commands.
-- Hotkeys for mode switching; configurable.
+- Shell-first UX: always run the real interactive shell in a PTY; history and tab completion are provided by the user’s shell, unmodified.
+- Headless + SSH-safe: no GUI takeover; operates inside SSH sessions.
+- Uniform UI: Shell, Agent, and Auto “modes” use the same terminal view; only routing behavior changes.
+- Natural language fallback: when the shell would fail to resolve a command, Lash routes the original input to the agent.
+- Minimal statusline with tiny confirmation panel; no chat UI required for core flows.
 
 ### Non-goals
-- Re-implementing POSIX shell semantics.
+- Re-implementing line editing, history, or tab completion.
 - Building a GUI/terminal emulator.
 - Replacing `ssh`; we delegate to the system `ssh` as needed.
 
-### High-level Architecture (on top of Crush)
-- Agent Mode (existing): retain Crush’s agent loop, MCP plumbing, config, and logging.
-- New Shell Mode: spawn the user’s real shell (e.g., `/bin/zsh`) in a PTY; pass-through input/output, support resize, preserve terminal features (e.g., Vim, less, fzf).
-- New Auto Mode: if the first token is a valid executable (absolute/relative path or found via PATH), route to Shell; otherwise route to Agent. Selected by default on first run; users can change modes via config or UI. The last selected mode is persisted across sessions.
-- Mode Router: central dispatcher that directs input to PTY (Shell) or MCP agent (Agent); applies Auto heuristics when enabled.
-- Statusline + Keymap: minimal mode indicator and key hints; configurable keybindings for mode switching and confirmations.
-- Non-interactive Guard: if no TTY or invoked with `-c`, immediately exec the real shell to preserve scripts/remote commands.
+### High-level Architecture
+- Always-on PTY: spawn the user’s real shell (e.g., `/bin/zsh`) in a PTY with full pass-through of input/output and resize.
+- Statusline + Panel: reserve the last terminal row for a thin statusline; render a small inline confirmation panel above it only when needed. PTY height is set to terminal height minus one row so full-screen apps don’t clobber the statusline.
+- Mode Router (routing policy only):
+  - Shell-first execution. The shell executes everything users type.
+  - On “command not found” (CNF), route the original line to the Agent. If the agent suggests commands, show a confirm panel; on confirm, inject commands into the same PTY.
+  - Optional explicit agent invocation via hotkey or prefix; otherwise flows are identical in appearance.
+- Shell Hooks (no compromises):
+  - Inject tiny RC fragments to install preexec/precmd (zsh) or DEBUG/PROMPT_COMMAND (bash) and command-not-found handlers.
+  - Hooks emit metadata and CNF signals as sentinel lines (not visible to the user) that Lash parses from the PTY stream.
+  - User RCs are preserved: our injected RC sources the user’s originals first, then adds small hook functions.
+- MCP Agent: reuse Crush’s MCP plumbing; agent runs headless and only surfaces a confirm panel when proposing command execution.
 
 ### Process Model
 1) Startup (interactive TTY):
-   - Load `crush.json` (kept for compatibility), read Lash extensions.
-   - Initialize TUI; active mode is the previously selected mode; if none exists (first run), default to Auto.
-   - Spawn PTY with real shell; lazy-start MCP client on first Agent use.
-2) Non-interactive or `-c` mode: exec the real shell with original arguments.
-3) SSH: works transparently when Lash is a login shell on remote hosts; the TUI renders over SSH.
+   - If `LASH_DISABLE=1`, exec the real shell immediately.
+   - Load `crush.json` (compatible), read Lash extensions.
+   - Initialize PTY pass-through with the user’s shell and inject RC fragments for hooks.
+   - Set PTY size to `(rows-1, cols)` and render statusline on the bottom row.
+   - Mode is a routing policy only; the UI does not change across modes.
+2) Non-interactive or `-c` mode:
+   - Exec the real shell with original args (no PTY/TUI), preserving scripts/remote commands.
+3) SSH:
+   - Works transparently with PTY pass-through and the statusline row.
 
 ### Configuration
-Crush already uses `crush.json` and supports MCP provider/server configuration and logging. Lash extends the schema via additive fields while preserving compatibility.
+Existing Crush config is preserved. Lash adds additive fields only.
 
 Example (JSON):
 ```json
 {
   "$schema": "https://charm.land/crush.json",
   "options": { "debug": false },
-  "mcp": {
-    "filesystem": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/mcp-server.js"]
-    }
-  },
+  "mcp": { "filesystem": { "type": "stdio", "command": "node", "args": ["/path/to/mcp.js"] } },
   "lash": {
-    "default_mode": "auto",         
-    "real_shell": "/bin/zsh",       
+    "default_mode": "auto",
+    "real_shell": "/bin/zsh",
     "statusline_position": "bottom",
     "auto_mode_enabled": true,
     "safety": { "confirm_agent_exec": true },
@@ -69,35 +73,63 @@ MCP in Crush supports stdio, http, and sse transports and environment variable e
 
 ### UI
 - Statusline (one row):
-  - Left: Mode [Shell|Agent|Auto]
-  - Middle: Context (local or `user@host` if Lash later adds a wrapper to system ssh)
-  - Right: Key hints (Ctrl-1/2/3; Ctrl-Enter)
-- Agent confirmation panel: Shows suggested command and short explanation; options: Confirm (Ctrl-Enter), Revise (prompt), Cancel (Esc). Hidden unless Agent proposes a command.
+  - Left: Mode [Shell|Agent|Auto] (routing policy indicator)
+  - Middle: Context (cwd, optionally `user@host`)
+  - Right: Key hints (Ctrl-1/2/3; Ctrl-Enter; Help)
+- Confirmation panel:
+  - Appears above the statusline only when the agent proposes commands.
+  - Options: Confirm (Ctrl-Enter), Revise (prompt), Cancel (Esc).
+- No separate chat UI required for core shell workflows; the terminal remains the primary surface.
 
 ### Keyboard Defaults
-- Ctrl-1: Shell mode
-- Ctrl-2: Agent mode
-- Ctrl-3: Auto mode
-- Ctrl-Enter: Confirm execution of agent-suggested command in Shell PTY
-- Ctrl-/: Help overlay
+- Ctrl-1: Routing policy to Shell-first only
+- Ctrl-2: Routing policy to Agent-first (force agent for next line)
+- Ctrl-3: Routing policy to Auto (Shell, falling back to Agent on CNF) [default]
+- Ctrl-Enter: Confirm execution of agent-suggested commands (into the same PTY)
+- Ctrl-/: Help overlay (compact)
+
+### Shell Hook Injection
+- zsh:
+  - Use `ZDOTDIR` to point to a small injected directory containing `.zshenv`/`.zshrc` fragments that first source the user’s originals, then define:
+    - `preexec()`: emit sentinel with the exact command.
+    - `precmd()`: emit last status `$?` as sentinel for robust CNF detection.
+    - `command_not_found_handler()`: emit sentinel with the original line and suppress default CNF text.
+- bash:
+  - Launch with `--rcfile` to an injected `.bashrc` that sources the user’s original rc and defines:
+    - `trap '...' DEBUG` or `PROMPT_COMMAND` to capture last command and status.
+    - `command_not_found_handle()`: emit sentinel and suppress default CNF text.
+- fish (optional later): add equivalent event hooks.
+- Sentinels are unique, single-line messages that Lash consumes from the PTY stream; they are not printed to the user’s screen.
+
+### Routing Behavior (Uniform Look/Feel)
+- Shell executes the line. If success: nothing special happens.
+- On CNF:
+  - Lash captures the original line via hooks and forwards it to the Agent as a natural-language request.
+  - Agent may respond with:
+    - Explanation only → show briefly in the statusline; no disruption.
+    - Suggested command(s) → show confirmation panel; on confirm, inject into the PTY as if typed by the user.
+- Explicit Agent:
+  - Hotkey or prefix forces the next line to the Agent (without attempting shell execution first), but the terminal view remains unchanged.
 
 ### Error Handling & Resilience
 - PTY failure: render inline error and exec the real shell directly as fallback.
-- MCP failure: keep Shell operational; surface non-intrusive error with retry.
-- Resize failures ignored but logged at debug level.
+- MCP failure: shell remains fully usable; show a non-intrusive status message.
+- Resize propagated to PTY; statusline reflows accordingly.
+- If hooks fail to load, fall back to Auto heuristic: first token executable check; if not, route to Agent.
 
 ### Security
-- Mandatory manual confirmation before executing agent-suggested commands.
-- Honor `known_hosts` via system `ssh` when used; do not auto-accept.
+- Confirm-to-execute is required for agent-suggested shell commands.
+- Honor SSH `known_hosts` via system `ssh`.
 - Redact likely secrets in logs; no secret persistence.
-- Bypass environment variable: `LASH_DISABLE=1` forces immediate exec of real shell at startup.
+- `LASH_DISABLE=1` bypasses Lash at startup.
 
 ### Implementation Notes
-- Language: Go (same as Crush).
-- PTY: `creack/pty` or equivalent to spawn and manage the user’s shell.
-- Integrate with Crush’s Bubble Tea stack and event loop; add a Shell subsystem and routing layer.
-- Packaging: keep GoReleaser flow; produce macOS and Linux binaries (amd64/arm64).
-- Licensing: maintain upstream license headers (FSL-1.1-MIT per Crush), include attribution and notices.
+- Language: Go.
+- PTY: `creack/pty` for pass-through and programmatic execution in the same session.
+- Statusline: render outside the PTY (reserved last row); PTY sized to rows-1.
+- Shell hooks: generate injected RC directories at runtime; source user RCs first to preserve user setup and completion/history; append minimal hook functions.
+- Agent integration: reuse Crush MCP, permissions, and logging. Confirm before injection.
+- Packaging: keep GoReleaser and upstream licenses.
 
 ### Alternatives Considered
 - Wrapper around Crush (unforked) plus a separate PTY TUI. Rejected for UX cohesion and deeper MCP features already embedded in Crush.

@@ -3,47 +3,55 @@
 ### Must-haves
 - MCP is mandatory. Use Crush’s built-in MCP mechanisms and configuration; do not remove or regress them. Reference: [charmbracelet/crush](https://github.com/charmbracelet/crush)
 - Headless operation in any Unix terminal, including over SSH.
-- Behaves like a normal login shell by default:
-  - Interactive TTY: start in the previously selected mode; on first run default to Auto. A real shell is always available in a PTY when Shell mode is active.
-  - Non-interactive or `-c`: immediately exec the real shell with original args (preserve scripts/remote commands).
-- Minimal UI with a one-line statusline showing current mode: Shell | Agent | Auto.
-- Mode switching via keybindings (default Ctrl-1/2/3); configurable.
+- Shell-first, uniform UX by default:
+  - Always run the user’s real shell (`$SHELL` or configured) in a PTY with full pass-through; preserve native history and tab completion.
+  - Modes are routing policies only; the terminal view is identical across Shell/Agent/Auto.
+  - Natural-language fallback on command-not-found (CNF). Explicit agent invocation available via hotkey/prefix.
+- Non-interactive or `-c`: immediately exec the real shell with original args (preserve scripts/remote commands).
+- Minimal UI with a reserved one-line statusline and a tiny confirmation panel when needed.
 - Agent-suggested commands never auto-execute; require explicit confirmation (default Ctrl-Enter).
 - Configuration via `crush.json` with a `lash` extension block; environment and flags override.
 - Logging compatible with Crush’s logging; add redaction for likely secrets.
 
 ### Functional Requirements
-1) Shell Mode
-   - Spawn real shell (`$SHELL` or configured binary) in a PTY.
-   - Pass-through keystrokes; support terminal features (vim, less, fzf, tmux inside).
-   - Handle window resize events and propagate to PTY.
-   - Execute confirmed commands from Agent in the same PTY context.
+1) Shell-first PTY
+   - Spawn real shell in a PTY; pass-through input/output.
+   - Reserve last terminal row for statusline by sizing PTY to `(rows-1, cols)`; propagate resize.
+   - Support full-screen TTY programs (vim, less, fzf, tmux) without interference.
+   - Execute confirmed agent suggestions inside the same PTY session.
 
-2) Agent Mode
-   - Keep Crush’s agent experience intact.
-   - MCP servers via stdio/http/sse as configured; environment expansion supported.
-   - Stream responses; capture suggested command and explanation for confirmation.
+2) Command-not-found Fallback
+   - Install minimal shell hooks to detect CNF and capture the original line:
+     - zsh: `preexec`, `precmd`, `command_not_found_handler` via injected RC fragments using `ZDOTDIR`.
+     - bash: `DEBUG`/`PROMPT_COMMAND`, `command_not_found_handle` via `--rcfile` to injected rc.
+   - Emit unique, non-visible sentinels that Lash consumes from the PTY stream.
+   - On CNF, forward the original line to the agent; show a compact confirmation when the agent proposes shell commands.
 
-3) Auto Mode
-   - Router enabled by default on first run:
-      - If first token resolves to an executable (absolute/relative path or via PATH) → Shell
-      - Otherwise → Agent
-    - Provide an override keybinding to temporarily route the next line to Agent.
+3) Agent Integration
+   - Preserve Crush’s agent flow and MCP configuration (stdio/http/sse; env expansion).
+   - Confirm-to-execute before injecting suggested commands into the PTY.
+   - Optional explicit agent invocation for the next line via hotkey/prefix.
 
-4) Login Shell Safety
+4) Routing Policies (Modes)
+   - Shell: execute only in shell (no CNF fallback unless explicitly invoked).
+   - Agent: force agent for next line (no shell attempt); terminal remains unchanged.
+   - Auto (default): shell-first with CNF fallback to agent.
+   - Persist last-selected policy; defaults to Auto on first run.
+
+5) Login Shell Safety
    - Works as the user’s login shell (`chsh`) and within SSH sessions.
    - Non-interactive behavior falls through to real shell.
    - Bypass via `LASH_DISABLE=1` env var to exec real shell immediately.
 
-5) SSH Interop
-   - When users run `lash` on a remote host via SSH, it should render as usual.
+6) SSH Interop
+   - Running under SSH should behave like a normal terminal, including statusline reservation and resize propagation.
    - Optional convenience: `lash ssh user@host` delegates to system `ssh` in a PTY.
 
-6) Configuration
-   - Preserve `crush.json` schema; add `lash` namespaced keys for mode defaults, keymap, safety toggles, shell path, router settings. Persist the last selected mode across sessions; if not present, use `lash.default_mode` (default: `auto`).
+7) Configuration
+   - Preserve `crush.json` schema; add `lash` namespaced keys for defaults, keymap, safety, shell path. Persist last-selected policy.
    - Hot-reload not required; re-read on startup is sufficient.
 
-7) Logging/Observability
+8) Logging/Observability
    - Reuse Crush’s logging; log to project-local and/or state directory per Crush behavior.
    - Redact likely secrets via regex patterns; toggle debug via config/flag.
 
@@ -59,7 +67,7 @@
 - No secrets stored; redact in logs and transcripts.
 
 ### Compatibility & Limits
-- Compatible with POSIX shells; does not aim to replace shell scripting semantics.
+- Compatible with POSIX shells; does not reimplement line editing/completion.
 - Does not interfere with `scp`/`sftp` or non-interactive SSH commands when set as login shell.
 
 ### External References

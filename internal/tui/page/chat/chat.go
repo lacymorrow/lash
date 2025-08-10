@@ -726,8 +726,8 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 
 	switch mode {
 	case "Shell":
-		sh := shell.GetPersistentShell(p.app.Config().WorkingDir())
-		stdout, stderr, err := sh.Exec(context.Background(), text)
+		pty := shell.GetUserPTY(p.app.Config().WorkingDir())
+		stdout, stderr, err := pty.Exec(context.Background(), text)
 		if err != nil {
 			if stderr == "" {
 				stderr = err.Error()
@@ -744,6 +744,14 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 			combined += "\n"
 		}
 		combined += stderr
+		if combined == "" && err == nil {
+			trimmed := strings.TrimSpace(text)
+			if strings.HasPrefix(trimmed, "cd") {
+				combined = "cwd: " + pty.GetWorkingDir()
+			} else {
+				combined = "(ok)"
+			}
+		}
 		_, _ = p.app.Messages.Create(context.Background(), session.ID, message.CreateMessageParams{
 			Role:  message.Assistant,
 			Parts: []message.ContentPart{message.TextContent{Text: combined}},
@@ -754,9 +762,9 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 	case "Auto":
 		// Decide based on heuristics only (no explicit prefixes)
 		if shouldRouteToShell(strings.TrimSpace(text)) {
-			// Prefer persistent shell; synthesize output if the command succeeds but prints nothing
-			sh := shell.GetUserPersistentShell(p.app.Config().WorkingDir())
-			stdout, stderr, err := sh.Exec(context.Background(), text)
+			// Use real user shell PTY; synthesize output if the command succeeds but prints nothing
+			pty := shell.GetUserPTY(p.app.Config().WorkingDir())
+			stdout, stderr, err := pty.Exec(context.Background(), text)
 			if err != nil {
 				if stderr == "" {
 					stderr = err.Error()
@@ -773,7 +781,7 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 				// No visible output; provide a helpful acknowledgement
 				trimmed := strings.TrimSpace(text)
 				if strings.HasPrefix(trimmed, "cd") {
-					combined = "cwd: " + sh.GetWorkingDir()
+					combined = "cwd: " + pty.GetWorkingDir()
 				} else {
 					combined = "(ok)"
 				}
