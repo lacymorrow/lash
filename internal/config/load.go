@@ -10,14 +10,15 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
 
 	"github.com/charmbracelet/catwalk/pkg/catwalk"
-	"github.com/lacymorrow/lash/internal/csync"
-	"github.com/lacymorrow/lash/internal/env"
-	"github.com/lacymorrow/lash/internal/log"
+	"github.com/charmbracelet/crush/internal/csync"
+	"github.com/charmbracelet/crush/internal/env"
+	"github.com/charmbracelet/crush/internal/log"
 )
 
 const defaultCatwalkURL = "https://catwalk.charm.sh"
@@ -41,10 +42,10 @@ func LoadReader(fd io.Reader) (*Config, error) {
 func Load(workingDir string, debug bool) (*Config, error) {
 	// uses default config paths
 	configPaths := []string{
-		findConfig(AppName),
+		globalConfig(),
 		GlobalConfigData(),
-		filepath.Join(workingDir, fmt.Sprintf("%s.json", AppName)),
-		filepath.Join(workingDir, fmt.Sprintf(".%s.json", AppName)),
+		filepath.Join(workingDir, fmt.Sprintf("%s.json", appName)),
+		filepath.Join(workingDir, fmt.Sprintf(".%s.json", appName)),
 	}
 	cfg, err := loadFromConfigPaths(configPaths)
 	if err != nil {
@@ -61,7 +62,7 @@ func Load(workingDir string, debug bool) (*Config, error) {
 
 	// Setup logs
 	log.Setup(
-		filepath.Join(cfg.Options.DataDirectory, "logs", fmt.Sprintf("%s.log", AppName)),
+		filepath.Join(cfg.Options.DataDirectory, "logs", fmt.Sprintf("%s.log", appName)),
 		cfg.Options.Debug,
 	)
 
@@ -95,12 +96,12 @@ func Load(workingDir string, debug bool) (*Config, error) {
 func PushPopCrushEnv() func() {
 	found := []string{}
 	for _, ev := range os.Environ() {
-		if strings.HasPrefix(ev, AppEnvPrefix) {
+		if strings.HasPrefix(ev, "CRUSH_") {
 			pair := strings.SplitN(ev, "=", 2)
 			if len(pair) != 2 {
 				continue
 			}
-			found = append(found, strings.TrimPrefix(pair[0], AppEnvPrefix))
+			found = append(found, strings.TrimPrefix(pair[0], "CRUSH_"))
 		}
 	}
 	backups := make(map[string]string)
@@ -109,7 +110,7 @@ func PushPopCrushEnv() func() {
 	}
 
 	for _, ev := range found {
-		os.Setenv(ev, os.Getenv(AppEnvPrefix+ev))
+		os.Setenv(ev, os.Getenv("CRUSH_"+ev))
 	}
 
 	restore := func() {
@@ -312,7 +313,7 @@ func (c *Config) setDefaults(workingDir string) {
 		c.Options.ContextPaths = []string{}
 	}
 	if c.Options.DataDirectory == "" {
-		c.Options.DataDirectory = filepath.Join(workingDir, DefaultDataDirectoryName)
+		c.Options.DataDirectory = filepath.Join(workingDir, defaultDataDirectory)
 	}
 	if c.Providers == nil {
 		c.Providers = csync.NewMap[string, ProviderConfig]()
@@ -323,42 +324,12 @@ func (c *Config) setDefaults(workingDir string) {
 	if c.MCP == nil {
 		c.MCP = make(map[string]MCPConfig)
 	}
-	// Infer MCP types when omitted
-	for name, m := range c.MCP {
-		if m.Type == "" {
-			inferred := inferMCPType(m)
-			if inferred == "" {
-				// leave empty to be handled later; but prefer stdio if command given
-				if m.Command != "" {
-					inferred = MCPStdio
-				} else if m.URL != "" {
-					inferred = MCPHttp
-				}
-			}
-			m.Type = inferred
-			c.MCP[name] = m
-		}
-	}
 	if c.LSP == nil {
 		c.LSP = make(map[string]LSPConfig)
 	}
 
-	// Default LSPs: enable Go via gopls if no LSPs are configured
-	if len(c.LSP) == 0 {
-		c.LSP["Go"] = LSPConfig{Command: "gopls"}
-	}
-
-	// Lash defaults
-	if c.Lash == nil {
-		c.Lash = &LashConfig{}
-	}
-	if c.Lash.Mode == "" {
-		c.Lash.Mode = "Auto"
-	}
-	if c.Lash.Safety.ConfirmAgentExec == nil {
-		v := false
-		c.Lash.Safety.ConfirmAgentExec = &v
-	}
+	// Apply default file types for known LSP servers if not specified
+	applyDefaultLSPFileTypes(c.LSP)
 
 	// Add the default context paths if they are not already present
 	c.Options.ContextPaths = append(defaultContextPaths, c.Options.ContextPaths...)
@@ -366,30 +337,36 @@ func (c *Config) setDefaults(workingDir string) {
 	c.Options.ContextPaths = slices.Compact(c.Options.ContextPaths)
 }
 
-// inferMCPType returns the MCP transport type based on provided fields.
-// Rules:
-//   - If Command is set, assume stdio
-//   - Else if URL is set, default http
-//   - If headers contain Accept: text/event-stream or URL path contains "/sse",
-//     then sse
-func inferMCPType(m MCPConfig) MCPType {
-	if strings.TrimSpace(m.Command) != "" {
-		return MCPStdio
-	}
-	if strings.TrimSpace(m.URL) == "" {
-		return ""
-	}
-	// Detect SSE hints via headers
-	for k, v := range m.Headers {
-		if strings.EqualFold(k, "Accept") && strings.Contains(strings.ToLower(v), "text/event-stream") {
-			return MCPSse
+var defaultLSPFileTypes = map[string][]string{
+	"gopls":                      {"go", "mod", "sum", "work"},
+	"typescript-language-server": {"ts", "tsx", "js", "jsx", "mjs", "cjs"},
+	"vtsls":                      {"ts", "tsx", "js", "jsx", "mjs", "cjs"},
+	"bash-language-server":       {"sh", "bash", "zsh", "ksh"},
+	"rust-analyzer":              {"rs"},
+	"pyright":                    {"py", "pyi"},
+	"pylsp":                      {"py", "pyi"},
+	"clangd":                     {"c", "cpp", "cc", "cxx", "h", "hpp"},
+	"jdtls":                      {"java"},
+	"vscode-html-languageserver": {"html", "htm"},
+	"vscode-css-languageserver":  {"css", "scss", "sass", "less"},
+	"vscode-json-languageserver": {"json", "jsonc"},
+	"yaml-language-server":       {"yaml", "yml"},
+	"lua-language-server":        {"lua"},
+	"solargraph":                 {"rb"},
+	"elixir-ls":                  {"ex", "exs"},
+	"zls":                        {"zig"},
+}
+
+// applyDefaultLSPFileTypes sets default file types for known LSP servers
+func applyDefaultLSPFileTypes(lspConfigs map[string]LSPConfig) {
+	for name, config := range lspConfigs {
+		if len(config.FileTypes) != 0 {
+			continue
 		}
+		bin := strings.ToLower(filepath.Base(config.Command))
+		config.FileTypes = defaultLSPFileTypes[bin]
+		lspConfigs[name] = config
 	}
-	// Detect SSE via URL hint
-	if strings.Contains(strings.ToLower(m.URL), "/sse") {
-		return MCPSse
-	}
-	return MCPHttp
 }
 
 func (c *Config) defaultModelSelection(knownProviders []catwalk.Provider) (largeModel SelectedModel, smallModel SelectedModel, err error) {
@@ -586,26 +563,46 @@ func hasAWSCredentials(env env.Env) bool {
 	return false
 }
 
+func globalConfig() string {
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome != "" {
+		return filepath.Join(xdgConfigHome, appName, fmt.Sprintf("%s.json", appName))
+	}
+
+	// return the path to the main config directory
+	// for windows, it should be in `%LOCALAPPDATA%/crush/`
+	// for linux and macOS, it should be in `$HOME/.config/crush/`
+	if runtime.GOOS == "windows" {
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData == "" {
+			localAppData = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+		}
+		return filepath.Join(localAppData, appName, fmt.Sprintf("%s.json", appName))
+	}
+
+	return filepath.Join(os.Getenv("HOME"), ".config", appName, fmt.Sprintf("%s.json", appName))
+}
+
 // GlobalConfigData returns the path to the main data directory for the application.
 // this config is used when the app overrides configurations instead of updating the global config.
 func GlobalConfigData() string {
-	base := XDGDataDir()
-
-	// Prioritize the current application directory
-	lashDir := filepath.Join(base, AppName)
-	lashData := filepath.Join(lashDir, CurrentConfigFilename)
-
-	if _, err := os.Stat(lashData); err == nil {
-		return lashData
+	xdgDataHome := os.Getenv("XDG_DATA_HOME")
+	if xdgDataHome != "" {
+		return filepath.Join(xdgDataHome, appName, fmt.Sprintf("%s.json", appName))
 	}
 
-	// Fallback to the legacy application directory
-	crushDir := filepath.Join(base, LegacyAppName)
-	crushData := filepath.Join(crushDir, LegacyConfigFilename)
-	if _, err := os.Stat(crushData); err == nil {
-		return crushData
+	// return the path to the main data directory
+	// for windows, it should be in `%LOCALAPPDATA%/crush/`
+	// for linux and macOS, it should be in `$HOME/.local/share/crush/`
+	if runtime.GOOS == "windows" {
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData == "" {
+			localAppData = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+		}
+		return filepath.Join(localAppData, appName, fmt.Sprintf("%s.json", appName))
 	}
-	return lashData
+
+	return filepath.Join(os.Getenv("HOME"), ".local", "share", appName, fmt.Sprintf("%s.json", appName))
 }
 
 var HomeDir = sync.OnceValue(func() string {

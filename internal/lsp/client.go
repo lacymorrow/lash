@@ -7,18 +7,19 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-    "github.com/lacymorrow/lash/internal/config"
-    "github.com/lacymorrow/lash/internal/log"
-    "github.com/lacymorrow/lash/internal/lsp/protocol"
+	"github.com/charmbracelet/crush/internal/config"
+	"github.com/charmbracelet/crush/internal/log"
+	"github.com/charmbracelet/crush/internal/lsp/protocol"
 )
 
 type Client struct {
@@ -29,6 +30,9 @@ type Client struct {
 
 	// Client name for identification
 	name string
+
+	// File types this LSP server handles (e.g., .go, .rs, .py)
+	fileTypes []string
 
 	// Diagnostic change callback
 	onDiagnosticsChanged func(name string, count int)
@@ -60,23 +64,12 @@ type Client struct {
 	serverState atomic.Value
 }
 
-func NewClient(ctx context.Context, name, command string, args ...string) (*Client, error) {
-    // If gopls is requested but not found, try to auto-install it locally
-    if strings.Contains(strings.ToLower(command), "gopls") {
-        if _, err := exec.LookPath(command); err != nil {
-            if cfg := config.Get(); cfg != nil {
-                if installedPath, instErr := installGopls(ctx, filepath.Join(cfg.Options.DataDirectory, "bin")); instErr == nil {
-                    command = installedPath
-                } else {
-                    slog.Debug("gopls auto-install failed", "error", instErr)
-                }
-            }
-        }
-    }
+// NewClient creates a new LSP client.
+func NewClient(ctx context.Context, name string, config config.LSPConfig) (*Client, error) {
+	cmd := exec.CommandContext(ctx, config.Command, config.Args...)
 
-    cmd := exec.CommandContext(ctx, command, args...)
 	// Copy env
-	cmd.Env = os.Environ()
+	cmd.Env = slices.Concat(os.Environ(), config.ResolvedEnv())
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -96,6 +89,7 @@ func NewClient(ctx context.Context, name, command string, args ...string) (*Clie
 	client := &Client{
 		Cmd:                   cmd,
 		name:                  name,
+		fileTypes:             config.FileTypes,
 		stdin:                 stdin,
 		stdout:                bufio.NewReader(stdout),
 		stderr:                stderr,
@@ -134,65 +128,6 @@ func NewClient(ctx context.Context, name, command string, args ...string) (*Clie
 	}()
 
 	return client, nil
-}
-
-// installGopls attempts to install gopls into a given bin directory and returns the absolute path.
-// It tries `go install golang.org/x/tools/gopls@latest` if Go is available.
-func installGopls(ctx context.Context, binDir string) (string, error) {
-    // Ensure Go is available
-    if _, err := exec.LookPath("go"); err != nil {
-        return "", fmt.Errorf("go toolchain not found: %w", err)
-    }
-
-    // Create bin dir
-    if err := os.MkdirAll(binDir, 0o755); err != nil {
-        return "", fmt.Errorf("failed to create bin dir: %w", err)
-    }
-
-    // On Windows the binary will be gopls.exe
-    exeName := "gopls"
-    if runtime.GOOS == "windows" {
-        exeName = "gopls.exe"
-    }
-    destPath := filepath.Join(binDir, exeName)
-
-    // If already exists, return
-    if _, err := os.Stat(destPath); err == nil {
-        return destPath, nil
-    }
-
-    // Install gopls into GOBIN or GOPATH/bin, then copy/symlink to dest
-    installCmd := exec.CommandContext(ctx, "go", "install", "golang.org/x/tools/gopls@latest")
-    installCmd.Env = os.Environ()
-    if out, err := installCmd.CombinedOutput(); err != nil {
-        return "", fmt.Errorf("failed to install gopls: %w (output: %s)", err, string(out))
-    }
-
-    // Locate installed gopls
-    goplsPath, err := exec.LookPath("gopls")
-    if err != nil {
-        return "", fmt.Errorf("gopls not found after install: %w", err)
-    }
-
-    // Copy binary to destPath
-    in, err := os.Open(goplsPath)
-    if err != nil {
-        return "", fmt.Errorf("failed to open installed gopls: %w", err)
-    }
-    defer in.Close()
-    out, err := os.Create(destPath)
-    if err != nil {
-        return "", fmt.Errorf("failed to create destination gopls: %w", err)
-    }
-    defer out.Close()
-    if _, err := io.Copy(out, in); err != nil {
-        return "", fmt.Errorf("failed to copy gopls: %w", err)
-    }
-    if err := out.Chmod(0o755); err != nil {
-        return "", fmt.Errorf("failed to chmod gopls: %w", err)
-    }
-
-    return destPath, nil
 }
 
 func (c *Client) RegisterNotificationHandler(method string, handler NotificationHandler) {
@@ -681,7 +616,34 @@ type OpenFileInfo struct {
 	URI     protocol.DocumentURI
 }
 
+// HandlesFile checks if this LSP client handles the given file based on its
+// extension.
+func (c *Client) HandlesFile(path string) bool {
+	// If no file types are specified, handle all files (backward compatibility)
+	if len(c.fileTypes) == 0 {
+		return true
+	}
+
+	name := strings.ToLower(filepath.Base(path))
+	for _, filetpe := range c.fileTypes {
+		suffix := strings.ToLower(filetpe)
+		if !strings.HasPrefix(suffix, ".") {
+			suffix = "." + suffix
+		}
+		if strings.HasSuffix(name, suffix) {
+			slog.Debug("handles file", "name", c.name, "file", name, "filetype", filetpe)
+			return true
+		}
+	}
+	slog.Debug("doesn't handle file", "name", c.name, "file", name)
+	return false
+}
+
 func (c *Client) OpenFile(ctx context.Context, filepath string) error {
+	if !c.HandlesFile(filepath) {
+		return nil
+	}
+
 	uri := string(protocol.URIFromPath(filepath))
 
 	c.openFilesMu.Lock()
@@ -838,7 +800,10 @@ func (c *Client) GetFileDiagnostics(uri protocol.DocumentURI) []protocol.Diagnos
 
 // GetDiagnostics returns all diagnostics for all files
 func (c *Client) GetDiagnostics() map[protocol.DocumentURI][]protocol.Diagnostic {
-	return c.diagnostics
+	c.diagnosticsMu.RLock()
+	defer c.diagnosticsMu.RUnlock()
+
+	return maps.Clone(c.diagnostics)
 }
 
 // OpenFileOnDemand opens a file only if it's not already open

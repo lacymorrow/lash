@@ -12,72 +12,14 @@ import (
 	"time"
 
 	"github.com/charmbracelet/catwalk/pkg/catwalk"
-	"github.com/lacymorrow/lash/internal/csync"
-	"github.com/lacymorrow/lash/internal/env"
+	"github.com/charmbracelet/crush/internal/csync"
+	"github.com/charmbracelet/crush/internal/env"
 	"github.com/tidwall/sjson"
 )
 
 const (
-	// AppName determines the base name of the configuration file looked up by the loader
-	// e.g. it will search for "crush.json" and ".crush.json" in the working directory
-	AppName                  = "lash"
-	DefaultDataDirectoryName = ".lash"
-	// LegacyAppName is the previous application name kept for backward-compatibility
-	LegacyAppName = "crush"
-
-	// ProvidersCacheFilename is the filename used to cache known providers
-	ProvidersCacheFilename = "providers.json"
-
-	// ProvidersCacheTTL defines how long the providers cache is considered fresh
-	ProvidersCacheTTL = 24 * time.Hour
-
-	// Current and legacy config filenames for data/config stores
-	CurrentConfigFilename = "lash.json"
-	LegacyConfigFilename  = "crush.json"
-
-	// Environment variable prefix used for scoped overrides
-	AppEnvPrefix = "LASH_"
-
-	// Standard HTTP headers and values used across providers
-	HeaderAuthorization    = "Authorization"
-	HeaderXAPIKey          = "x-api-key"
-	HeaderAnthropicVersion = "anthropic-version"
-	HeaderRetryAfter       = "Retry-After"
-	BearerPrefix           = "Bearer "
-
-	// Default provider base URLs and versions
-	DefaultOpenAIBaseURL    = "https://api.openai.com/v1"
-	DefaultAnthropicBaseURL = "https://api.anthropic.com"
-	DefaultGeminiBaseURL    = "https://generativelanguage.googleapis.com"
-	DefaultAnthropicAPIVer  = "2023-06-01"
-
-	// Default timeout for simple provider connectivity checks
-	DefaultHTTPTestTimeout = 5 * time.Second
-
-	// UI verification spinner minimum duration to ensure visible feedback
-	VerificationMinSpinnerDuration = 750 * time.Millisecond
-
-	// Onboarding delay before auto-submitting a verified API key
-	OnboardingAPIKeySubmitDelay = 5 * time.Second
-
-	// Safety buffers for context-limit handling
-	ContextLimitBufferTokens = 1000
-	MinSafeMaxTokens         = 1000
-
-	// Logs and UI defaults
-	DefaultTailLines = 1000
-
-	// Tool defaults
-	DefaultBashTimeoutMs = 1 * 60 * 1000  // 1 minute in ms
-	MaxBashTimeoutMs     = 10 * 60 * 1000 // 10 minutes in ms
-	MaxBashOutputChars   = 30000
-
-	// System buffers
-	DefaultDBPageSize  = 4096
-	DefaultPTYReadSize = 4096
-
-	// Storage filenames
-	DefaultDBFilename = "lash.db"
+	appName              = "crush"
+	defaultDataDirectory = ".crush"
 )
 
 var defaultContextPaths = []string{
@@ -86,26 +28,14 @@ var defaultContextPaths = []string{
 	".cursor/rules/",
 	"CLAUDE.md",
 	"CLAUDE.local.md",
-	"Claude.md",
-	"Claude.local.md",
-	"claude.md",
-	"claude.local.md",
 	"GEMINI.md",
 	"gemini.md",
-	"lash.md",
-	"lash.local.md",
+	"crush.md",
+	"crush.local.md",
 	"Crush.md",
 	"Crush.local.md",
 	"CRUSH.md",
 	"CRUSH.local.md",
-	"crush.md",
-	"crush.local.md",
-	"AGENT.md",
-	"AGENT.local.md",
-	"Agent.md",
-	"Agent.local.md",
-	"agent.md",
-	"agent.local.md",
 	"AGENTS.md",
 	"agents.md",
 	"Agents.md",
@@ -177,23 +107,27 @@ type MCPConfig struct {
 	Command  string            `json:"command,omitempty" jsonschema:"description=Command to execute for stdio MCP servers,example=npx"`
 	Env      map[string]string `json:"env,omitempty" jsonschema:"description=Environment variables to set for the MCP server"`
 	Args     []string          `json:"args,omitempty" jsonschema:"description=Arguments to pass to the MCP server command"`
-	Type     MCPType           `json:"type,omitempty" jsonschema:"description=Type of MCP connection,enum=stdio,enum=sse,enum=http,default=stdio"`
+	Type     MCPType           `json:"type" jsonschema:"required,description=Type of MCP connection,enum=stdio,enum=sse,enum=http,default=stdio"`
 	URL      string            `json:"url,omitempty" jsonschema:"description=URL for HTTP or SSE MCP servers,format=uri,example=http://localhost:3000/mcp"`
 	Disabled bool              `json:"disabled,omitempty" jsonschema:"description=Whether this MCP server is disabled,default=false"`
+	Timeout  int               `json:"timeout,omitempty" jsonschema:"description=Timeout in seconds for MCP server connections,default=15,example=30,example=60,example=120"`
 
 	// TODO: maybe make it possible to get the value from the env
 	Headers map[string]string `json:"headers,omitempty" jsonschema:"description=HTTP headers for HTTP/SSE MCP servers"`
 }
 
 type LSPConfig struct {
-	Disabled bool     `json:"enabled,omitempty" jsonschema:"description=Whether this LSP server is disabled,default=false"`
-	Command  string   `json:"command" jsonschema:"required,description=Command to execute for the LSP server,example=gopls"`
-	Args     []string `json:"args,omitempty" jsonschema:"description=Arguments to pass to the LSP server command"`
-	Options  any      `json:"options,omitempty" jsonschema:"description=LSP server-specific configuration options"`
+	Disabled  bool              `json:"enabled,omitempty" jsonschema:"description=Whether this LSP server is disabled,default=false"`
+	Command   string            `json:"command" jsonschema:"required,description=Command to execute for the LSP server,example=gopls"`
+	Args      []string          `json:"args,omitempty" jsonschema:"description=Arguments to pass to the LSP server command"`
+	Env       map[string]string `json:"env,omitempty" jsonschema:"description=Environment variables to set to the LSP server command"`
+	Options   any               `json:"options,omitempty" jsonschema:"description=LSP server-specific configuration options"`
+	FileTypes []string          `json:"filetypes,omitempty" jsonschema:"description=File types this LSP server handles,example=go,example=mod,example=rs,example=c,example=js,example=ts"`
 }
 
 type TUIOptions struct {
-	CompactMode bool `json:"compact_mode,omitempty" jsonschema:"description=Enable compact mode for the TUI interface,default=false"`
+	CompactMode bool   `json:"compact_mode,omitempty" jsonschema:"description=Enable compact mode for the TUI interface,default=false"`
+	DiffMode    string `json:"diff_mode,omitempty" jsonschema:"description=Diff mode for the TUI interface,enum=unified,enum=split"`
 	// Here we can add themes later or any TUI related options
 }
 
@@ -202,33 +136,13 @@ type Permissions struct {
 	SkipRequests bool     `json:"-"`                                                                                                                              // Automatically accept all permissions (YOLO mode)
 }
 
-// LashSafety holds Lash-specific safety toggles.
-type LashSafety struct {
-	// If true (default), agent-suggested shell executions require confirmation.
-	// If false, agent-suggested commands can execute without prompting.
-	ConfirmAgentExec *bool `json:"confirm_agent_exec,omitempty" jsonschema:"description=Require confirmation before executing agent-suggested shell commands (bash:execute),default=true"`
-}
-
-// LashConfig is the optional Lash-specific configuration namespace.
-type LashConfig struct {
-	// Mode persists the last selected app mode: Shell, Agent, or Auto
-	Mode string `json:"mode,omitempty" jsonschema:"description=Last selected app mode (Shell, Agent, or Auto),enum=Shell,enum=Agent,enum=Auto,default=Auto"`
-	// YOLO enables skipping all permission prompts (global auto-approve)
-	Yolo   bool       `json:"yolo,omitempty" jsonschema:"description=Skip all permission prompts (YOLO mode),default=false"`
-	Safety LashSafety `json:"safety,omitempty" jsonschema:"description=Lash-specific safety options"`
-}
-
 type Options struct {
 	ContextPaths         []string    `json:"context_paths,omitempty" jsonschema:"description=Paths to files containing context information for the AI,example=.cursorrules,example=CRUSH.md"`
 	TUI                  *TUIOptions `json:"tui,omitempty" jsonschema:"description=Terminal user interface options"`
 	Debug                bool        `json:"debug,omitempty" jsonschema:"description=Enable debug logging,default=false"`
 	DebugLSP             bool        `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
 	DisableAutoSummarize bool        `json:"disable_auto_summarize,omitempty" jsonschema:"description=Disable automatic conversation summarization,default=false"`
-	DataDirectory        string      `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data (relative to working directory),default=.lash,example=.lash"` // Relative to the cwd
-	// Maximum duration for a single agent request before it is canceled. If 0, no global request timeout is applied.
-	RequestTimeoutSeconds int `json:"request_timeout_seconds,omitempty" jsonschema:"description=Max duration in seconds for a single agent request; when set, requests are canceled after this time"`
-	// Maximum duration for each individual tool call unless the tool specifies a shorter timeout. If 0, no extra per-tool cap is applied.
-	ToolCallTimeoutSeconds int `json:"tool_call_timeout_seconds,omitempty" jsonschema:"description=Max duration in seconds for each tool call unless the tool specifies a shorter timeout"`
+	DataDirectory        string      `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data (relative to working directory),default=.crush,example=.crush"` // Relative to the cwd
 }
 
 type MCPs map[string]MCPConfig
@@ -273,40 +187,12 @@ func (l LSPs) Sorted() []LSP {
 	return sorted
 }
 
+func (l LSPConfig) ResolvedEnv() []string {
+	return resolveEnvs(l.Env)
+}
+
 func (m MCPConfig) ResolvedEnv() []string {
-	// Start from the current process environment so stdio MCPs inherit PATH, HOME, etc.
-	baseEnv := os.Environ()
-
-	// Resolve and overlay user-provided env vars
-	resolver := NewShellVariableResolver(env.New())
-	overrides := make(map[string]string, len(m.Env))
-	for key, value := range m.Env {
-		resolved, err := resolver.ResolveValue(value)
-		if err != nil {
-			slog.Error("error resolving environment variable", "error", err, "variable", key, "value", value)
-			continue
-		}
-		overrides[key] = resolved
-	}
-
-	// Apply overrides to baseEnv, preserving other variables
-	// exec.Cmd.Env expects KEY=VALUE pairs; replacing in-place avoids duplicates
-	for key, value := range overrides {
-		replaced := false
-		prefix := key + "="
-		for i := range baseEnv {
-			if strings.HasPrefix(baseEnv[i], prefix) {
-				baseEnv[i] = prefix + value
-				replaced = true
-				break
-			}
-		}
-		if !replaced {
-			baseEnv = append(baseEnv, prefix+value)
-		}
-	}
-
-	return baseEnv
+	return resolveEnvs(m.Env)
 }
 
 func (m MCPConfig) ResolvedHeaders() map[string]string {
@@ -349,7 +235,7 @@ type Agent struct {
 	ContextPaths []string `json:"context_paths,omitempty"`
 }
 
-// Config holds the configuration for lash.
+// Config holds the configuration for crush.
 type Config struct {
 	Schema string `json:"$schema,omitempty"`
 
@@ -367,9 +253,6 @@ type Config struct {
 
 	Permissions *Permissions `json:"permissions,omitempty" jsonschema:"description=Permission settings for tool usage"`
 
-	// Lash-specific configuration
-	Lash *LashConfig `json:"lash,omitempty" jsonschema:"description=Lash-specific options"`
-
 	// Internal
 	workingDir string `json:"-"`
 	// TODO: most likely remove this concept when I come back to it
@@ -382,29 +265,6 @@ type Config struct {
 
 func (c *Config) WorkingDir() string {
 	return c.workingDir
-}
-
-// ActiveMode returns the persisted mode or "Auto" when unset.
-func (c *Config) ActiveMode() string {
-	if c == nil {
-		return "Auto"
-	}
-	if c.Lash == nil {
-		return "Auto"
-	}
-	if strings.TrimSpace(c.Lash.Mode) == "" {
-		return "Auto"
-	}
-	return c.Lash.Mode
-}
-
-// SetActiveMode persists the given mode under lash.mode and updates in-memory state.
-func (c *Config) SetActiveMode(mode string) error {
-	if c.Lash == nil {
-		c.Lash = &LashConfig{}
-	}
-	c.Lash.Mode = mode
-	return c.SetConfigField("lash.mode", mode)
 }
 
 func (c *Config) EnabledProviders() []ProviderConfig {
@@ -427,16 +287,6 @@ func (c *Config) GetModel(provider, model string) *catwalk.Model {
 		for _, m := range providerConfig.Models {
 			if m.ID == model {
 				return &m
-			}
-		}
-	}
-	// Support synthetic Anthropic Max provider by falling back to real Anthropic catalog
-	if provider == "anthropic-max" {
-		if providerConfig, ok := c.Providers.Get(string(catwalk.InferenceProviderAnthropic)); ok {
-			for _, m := range providerConfig.Models {
-				if m.ID == model {
-					return &m
-				}
 			}
 		}
 	}
@@ -481,9 +331,6 @@ func (c *Config) SmallModel() *catwalk.Model {
 func (c *Config) SetCompactMode(enabled bool) error {
 	if c.Options == nil {
 		c.Options = &Options{}
-	}
-	if c.Options.TUI == nil {
-		c.Options.TUI = &TUIOptions{}
 	}
 	c.Options.TUI.CompactMode = enabled
 	return c.SetConfigField("options.tui.compact_mode", enabled)
@@ -607,34 +454,30 @@ func (c *ProviderConfig) TestConnection(resolver VariableResolver) error {
 	testURL := ""
 	headers := make(map[string]string)
 	apiKey, _ := resolver.ResolveValue(c.APIKey)
-	
-	// Note: OAuth tokens for anthropic-max might be expired, but we can't refresh here
-	// due to import cycle. The provider will handle refresh on actual API calls.
-	
 	switch c.Type {
 	case catwalk.TypeOpenAI:
 		baseURL, _ := resolver.ResolveValue(c.BaseURL)
 		if baseURL == "" {
-			baseURL = DefaultOpenAIBaseURL
+			baseURL = "https://api.openai.com/v1"
 		}
 		testURL = baseURL + "/models"
-		headers[HeaderAuthorization] = BearerPrefix + apiKey
+		headers["Authorization"] = "Bearer " + apiKey
 	case catwalk.TypeAnthropic:
 		baseURL, _ := resolver.ResolveValue(c.BaseURL)
 		if baseURL == "" {
-			baseURL = DefaultAnthropicBaseURL
+			baseURL = "https://api.anthropic.com/v1"
 		}
-		// Anthropic doesn't have a /models endpoint, so we skip the connectivity test
-		// The actual API calls will handle authentication errors
-		return nil
+		testURL = baseURL + "/models"
+		headers["x-api-key"] = apiKey
+		headers["anthropic-version"] = "2023-06-01"
 	case catwalk.TypeGemini:
 		baseURL, _ := resolver.ResolveValue(c.BaseURL)
 		if baseURL == "" {
-			baseURL = DefaultGeminiBaseURL
+			baseURL = "https://generativelanguage.googleapis.com"
 		}
 		testURL = baseURL + "/v1beta/models?key=" + url.QueryEscape(apiKey)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultHTTPTestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	client := &http.Client{}
 	req, err := http.NewRequestWithContext(ctx, "GET", testURL, nil)
@@ -656,4 +499,22 @@ func (c *ProviderConfig) TestConnection(resolver VariableResolver) error {
 	}
 	_ = b.Body.Close()
 	return nil
+}
+
+func resolveEnvs(envs map[string]string) []string {
+	resolver := NewShellVariableResolver(env.New())
+	for e, v := range envs {
+		var err error
+		envs[e], err = resolver.ResolveValue(v)
+		if err != nil {
+			slog.Error("error resolving environment variable", "error", err, "variable", e, "value", v)
+			continue
+		}
+	}
+
+	res := make([]string, 0, len(envs))
+	for k, v := range envs {
+		res = append(res, fmt.Sprintf("%s=%s", k, v))
+	}
+	return res
 }

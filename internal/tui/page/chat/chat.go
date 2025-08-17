@@ -756,6 +756,10 @@ func (p *chatPage) cancel() tea.Cmd {
 		return nil
 	}
 
+	if p.app.CoderAgent != nil && p.app.CoderAgent.QueuedPrompts(p.session.ID) > 0 {
+		p.app.CoderAgent.ClearQueue(p.session.ID)
+		return nil
+	}
 	p.isCanceling = true
 	return cancelTimerCmd()
 }
@@ -990,6 +994,12 @@ func (p *chatPage) Help() help.KeyMap {
 				cancelBinding = key.NewBinding(
 					key.WithKeys("esc"),
 					key.WithHelp("esc", "press again to cancel"),
+				)
+			}
+			if p.app.CoderAgent.QueuedPrompts(p.session.ID) > 0 {
+				cancelBinding = key.NewBinding(
+					key.WithKeys("esc"),
+					key.WithHelp("esc", "clear queue"),
 				)
 			}
 			shortList = append(shortList, cancelBinding)

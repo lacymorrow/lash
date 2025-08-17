@@ -2,10 +2,26 @@
 # vim: set ts=2 sw=2 tw=0 fo=jcroql
 version: 2
 
-project_name: lash
+project_name: crush
+
+includes:
+  - from_url:
+      url: charmbracelet/meta/main/notarize.yaml
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
+  license: "FSL-1.1-MIT"
+  homepage: "https://charm.sh/crush"
+  description: "A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal."
+  full_description: "A powerful terminal-based AI assistant for developers, providing intelligent coding assistance directly in your terminal."
+  maintainers:
+    - "kujtimiihoxha <kujtim@charm.sh>"
+    - "caarlos0 <carlos@charm.sh>" # for aur
+
+nightly:
+  publish_release: true
+  keep_single_release: true
+  version_template: "{{ incminor .Version }}-nightly"
 
 snapshot:
   version_template: "0.0.0-{{ .Timestamp }}"
@@ -17,10 +33,10 @@ before:
     - mkdir completions
     - rm -rf manpages
     - mkdir manpages
-    - sh -c 'go run . completion bash >./completions/lash.bash'
-    - sh -c 'go run . completion zsh >./completions/lash.zsh'
-    - sh -c 'go run . completion fish >./completions/lash.fish'
-    - sh -c 'go run . man | gzip -c >./manpages/lash.1.gz'
+    - sh -c 'go run . completion bash >./completions/crush.bash'
+    - sh -c 'go run . completion zsh >./completions/crush.zsh'
+    - sh -c 'go run . completion fish >./completions/crush.fish'
+    - sh -c 'go run . man | gzip -c >./manpages/crush.1.gz'
 
 # gomod:
 #   proxy: true
@@ -28,6 +44,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+      - GOEXPERIMENT=greenteagc
     goos:
       - linux
       - darwin
@@ -35,6 +52,7 @@ builds:
       - freebsd
       - openbsd
       - netbsd
+      - android
     goarch:
       - amd64
       - arm64
@@ -42,12 +60,19 @@ builds:
       - arm
     goarm:
       - "7"
+    ignore:
+      - goos: android
+        goarch: amd64
+      - goos: android
+        goarch: arm
+      - goos: android
+        goarch: "386"
     ldflags:
-      - -s -w -X github.com/lacymorrow/lash/internal/version.Version={{.Version}}
+      - -s -w -X github.com/charmbracelet/crush/internal/version.Version={{.Version}}
 
 archives:
   - name_template: >-
-      lash_
+      crush_
       {{- .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
@@ -67,78 +92,92 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# aur_sources:
-#   - private_key: "{{ .Env.AUR_KEY }}"
-#     git_url: "ssh://aur@aur.archlinux.org/lash.git"
-#     makedepends:
-#       - go
-#       - git
-#     prepare: |-
-#       go mod download
-#     build: |-
-#       mkdir completions
-#       mkdir manpages
-#       export CGO_CPPFLAGS="${CPPFLAGS}"
-#       export CGO_CFLAGS="${CFLAGS}"
-#       export CGO_CXXFLAGS="${CXXFLAGS}"
-#       export CGO_LDFLAGS="${LDFLAGS}"
-#       export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-#       go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=v${pkgver}" .
-#       ./lash completion bash >./completions/lash.bash
-#       ./lash completion zsh >./completions/lash.zsh
-#       ./lash completion fish >./completions/lash.fish
-#       ./lash man | gzip -c >./manpages/lash.1.gz
-#     package: |-
-#       # bin
-#       install -Dm755 "./lash" "${pkgdir}/usr/bin/lash"
-#       # license
-#       mkdir -p "${pkgdir}/usr/share/licenses/lash/"
-#       install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/lash/"
-#       # completions
-#       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
-#       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
-#       mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-#       install -Dm644 "./completions/lash.bash" "${pkgdir}/usr/share/bash-completion/completions/lash"
-#       install -Dm644 "./completions/lash.zsh" "${pkgdir}/usr/share/zsh/site-functions/_lash"
-#       install -Dm644 "./completions/lash.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/lash.fish"
-#       # man pages
-#       install -Dm644 "./manpages/lash.1.gz" "${pkgdir}/usr/share/man/man1/lash.1.gz"
-#       # readme
-#       mkdir -pv "${pkgdir}/usr/share/doc/lash/"
-#       install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
+aur_sources:
+  - private_key: "{{ .Env.AUR_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/crush.git"
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
+    makedepends:
+      - go
+      - git
+    prepare: |-
+      go mod download
+    build: |-
+      mkdir completions
+      mkdir manpages
+      export CGO_CPPFLAGS="${CPPFLAGS}"
+      export CGO_CFLAGS="${CFLAGS}"
+      export CGO_CXXFLAGS="${CXXFLAGS}"
+      export CGO_LDFLAGS="${LDFLAGS}"
+      export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+      go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=v${pkgver}" .
+      ./crush completion bash >./completions/crush.bash
+      ./crush completion zsh >./completions/crush.zsh
+      ./crush completion fish >./completions/crush.fish
+      ./crush man | gzip -c >./manpages/crush.1.gz
+    package: |-
+      # bin
+      install -Dm755 "./crush" "${pkgdir}/usr/bin/crush"
+      # license
+      mkdir -p "${pkgdir}/usr/share/licenses/crush/"
+      install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/crush/"
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      install -Dm644 "./completions/crush.bash" "${pkgdir}/usr/share/bash-completion/completions/crush"
+      install -Dm644 "./completions/crush.zsh" "${pkgdir}/usr/share/zsh/site-functions/_crush"
+      install -Dm644 "./completions/crush.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/crush.fish"
+      # man pages
+      install -Dm644 "./manpages/crush.1.gz" "${pkgdir}/usr/share/man/man1/crush.1.gz"
+      # readme
+      mkdir -pv "${pkgdir}/usr/share/doc/crush/"
+      install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
 
-# aurs:
-#   - private_key: "{{ .Env.AUR_KEY }}"
-#     git_url: "ssh://aur@aur.archlinux.org/lash-bin.git"
-#     provides:
-#       - lash
-#     conflicts:
-#       - lash
-#     package: |-
-#       cd "${srcdir}/lash_${pkgver}_Linux_${CARCH}"
-#       # bin
-#       install -Dm755 "./lash" "${pkgdir}/usr/bin/lash"
-#       # license
-#       mkdir -p "${pkgdir}/usr/share/licenses/lash/"
-#       install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/lash/"
-#       # completions
-#       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
-#       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
-#       mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-#       install -Dm644 "./completions/lash.bash" "${pkgdir}/usr/share/bash-completion/completions/lash"
-#       install -Dm644 "./completions/lash.zsh" "${pkgdir}/usr/share/zsh/site-functions/_lash"
-#       install -Dm644 "./completions/lash.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/lash.fish"
-#       # man pages
-#       install -Dm644 "./manpages/lash.1.gz" "${pkgdir}/usr/share/man/man1/lash.1.gz"
-#       # readme
-#       mkdir -pv "${pkgdir}/usr/share/doc/lash/"
-#       install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
+aurs:
+  - private_key: "{{ .Env.AUR_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/crush-bin.git"
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
+    provides:
+      - crush
+    conflicts:
+      - crush
+    package: |-
+      cd "${srcdir}/crush_${pkgver}_Linux_${CARCH}"
+      # bin
+      install -Dm755 "./crush" "${pkgdir}/usr/bin/crush"
+      # license
+      mkdir -p "${pkgdir}/usr/share/licenses/crush/"
+      install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/crush/"
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      install -Dm644 "./completions/crush.bash" "${pkgdir}/usr/share/bash-completion/completions/crush"
+      install -Dm644 "./completions/crush.zsh" "${pkgdir}/usr/share/zsh/site-functions/_crush"
+      install -Dm644 "./completions/crush.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/crush.fish"
+      # man pages
+      install -Dm644 "./manpages/crush.1.gz" "${pkgdir}/usr/share/man/man1/crush.1.gz"
+      # readme
+      mkdir -pv "${pkgdir}/usr/share/doc/crush/"
+      install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
+
+furies:
+  - disable: "{{ .IsNightly }}"
+    account: "{{ with .Env.FURY_TOKEN }}charmcli{{ else }}{{ end }}"
+    secret_name: FURY_TOKEN
 
 brews:
   - repository:
-      owner: lacymorrow
+      owner: charmbracelet
       name: homebrew-tap
-      token: "{{ .Env.GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
     goarm: 7
     extra_install: |-
       bash_completion.install "completions/{{ .ProjectName }}.bash" => "{{ .ProjectName }}"
@@ -146,11 +185,20 @@ brews:
       fish_completion.install "completions/{{ .ProjectName }}.fish"
       man1.install "manpages/{{ .ProjectName }}.1.gz"
 
-# scoops:
-#   - repository:
-#       owner: lacymorrow
-#       name: scoop-bucket
-#       token: "{{ .Env.GITHUB_TOKEN }}"
+scoops:
+  - repository:
+      owner: charmbracelet
+      name: scoop-bucket
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
+
+npms:
+  - name: "@charmland/crush"
+    repository: "git+https://github.com/charmbracelet/crush.git"
+    bugs: https://github.com/charmbracelet/crush/issues
+    access: public
 
 nfpms:
   - formats:
@@ -158,20 +206,17 @@ nfpms:
       - deb
       - rpm
       - archlinux
+      - termux.deb
     file_name_template: "{{ .ConventionalFileName }}"
-    maintainer: "lacymorrow <dev@lacymorrow.com>"
-    description: "Lash: terminal-based AI assistant for developers."
-    homepage: "https://github.com/lacymorrow/lash"
-    license: "FSL-1.1-MIT"
     contents:
-      - src: ./completions/lash.bash
-        dst: /etc/bash_completion.d/lash
-      - src: ./completions/lash.fish
-        dst: /usr/share/fish/vendor_completions.d/lash.fish
-      - src: ./completions/lash.zsh
-        dst: /usr/share/zsh/site-functions/_lash
-      - src: ./manpages/lash.1.gz
-        dst: /usr/share/man/man1/lash.1.gz
+      - src: ./completions/crush.bash
+        dst: /etc/bash_completion.d/crush
+      - src: ./completions/crush.fish
+        dst: /usr/share/fish/vendor_completions.d/crush.fish
+      - src: ./completions/crush.zsh
+        dst: /usr/share/zsh/site-functions/_crush
+      - src: ./manpages/crush.1.gz
+        dst: /usr/share/man/man1/crush.1.gz
     rpm:
       signature:
         key_file: '{{ if ne (index .Env "GPG_KEY_PATH") "" }}{{ .Env.GPG_KEY_PATH }}{{ else }}{{ end }}'
@@ -179,46 +224,57 @@ nfpms:
       signature:
         key_file: '{{ if ne (index .Env "GPG_KEY_PATH") "" }}{{ .Env.GPG_KEY_PATH }}{{ else }}{{ end }}'
 
-# signs:
-#   - cmd: cosign
-#     certificate: "${artifact}.pem"
-#     args:
-#       - sign-blob
-#       - "--output-certificate=${certificate}"
-#       - "--output-signature=${signature}"
-#       - "${artifact}"
-#       - "--yes"
-#     artifacts: checksum
-#     output: true
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
 
 source:
   enabled: true
 
-# sboms:
-#   - artifacts: archive
-#   - id: source
-#     artifacts: source
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source
 
 nix:
   - repository:
-      owner: "lacymorrow"
+      owner: "charmbracelet"
       name: nur
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    license: mit
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
+    license: fsl11Mit
     extra_install: |-
-      installManPage ./manpages/lash.1.gz
+      installManPage ./manpages/crush.1.gz
       installShellCompletion ./completions/*
 
 winget:
-  - publisher: lacymorrow
+  - publisher: charmbracelet
+    copyright: Charmbracelet, Inc
+    publisher_url: https://charm.land
+    release_notes_url: "https://github.com/charmbracelet/crush/releases/tag/{{.Tag}}"
+    license_url: https://github.com/charmbracelet/crush/blob/main/LICENSE.md
+    commit_author:
+      name: "Charm"
+      email: "charmcli@users.noreply.github.com"
     repository:
-      owner: "lacymorrow"
+      owner: "charmbracelet"
       name: winget-pkgs
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-      branch: "lash-{{.Version}}"
+      branch: "crush-{{.Version}}"
       pull_request:
         enabled: true
         draft: false
+        check_boxes: true
         base:
           owner: microsoft
           name: winget-pkgs
@@ -226,6 +282,7 @@ winget:
 
 changelog:
   sort: asc
+  disable: "{{ .IsNightly }}"
   use: github
   filters:
     exclude:
@@ -268,3 +325,6 @@ changelog:
 
 release:
   prerelease: auto
+  footer:
+    from_url:
+      url: https://raw.githubusercontent.com/charmbracelet/meta/main/footer.md

@@ -1,21 +1,23 @@
 package agent
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/lacymorrow/lash/internal/config"
-	"github.com/lacymorrow/lash/internal/csync"
-	"github.com/lacymorrow/lash/internal/llm/tools"
-	"github.com/lacymorrow/lash/internal/permission"
-	"github.com/lacymorrow/lash/internal/pubsub"
-	"github.com/lacymorrow/lash/internal/version"
+	"github.com/charmbracelet/crush/internal/config"
+	"github.com/charmbracelet/crush/internal/csync"
+	"github.com/charmbracelet/crush/internal/llm/tools"
+	"github.com/charmbracelet/crush/internal/permission"
+	"github.com/charmbracelet/crush/internal/pubsub"
+	"github.com/charmbracelet/crush/internal/version"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -78,10 +80,6 @@ var (
 	mcpClients   = csync.NewMap[string, *client.Client]()
 	mcpStates    = csync.NewMap[string, MCPClientInfo]()
 	mcpBroker    = pubsub.NewBroker[MCPEvent]()
-	// Keep original MCP configs so we can restart clients on transport errors.
-	mcpClientConfigs = csync.NewMap[string, config.MCPConfig]()
-	// Per-client locks to prevent concurrent restarts.
-	mcpClientLocks = csync.NewMap[string, *sync.Mutex]()
 )
 
 type McpTool struct {
@@ -108,129 +106,62 @@ func (b *McpTool) Info() tools.ToolInfo {
 	}
 }
 
-func isTransientTransportError(err error) bool {
-	if err == nil {
-		return false
-	}
-	e := strings.ToLower(err.Error())
-	return strings.Contains(e, "broken pipe") ||
-		strings.Contains(e, "connection reset") ||
-		strings.Contains(e, "eof") ||
-		strings.Contains(e, "use of closed network connection") ||
-		strings.Contains(e, "transport error")
-}
-
-func getClientLock(name string) *sync.Mutex {
-	if l, ok := mcpClientLocks.Get(name); ok && l != nil {
-		return l
-	}
-	m := &sync.Mutex{}
-	mcpClientLocks.Set(name, m)
-	return m
-}
-
-func restartMCPClient(ctx context.Context, name string) (*client.Client, error) {
-	cfg, ok := mcpClientConfigs.Get(name)
-	if !ok {
-		return nil, fmt.Errorf("no mcp config found for %s", name)
-	}
-
-	lock := getClientLock(name)
-	lock.Lock()
-	defer lock.Unlock()
-
-	// Close any existing client
-	if existing, ok := mcpClients.Take(name); ok && existing != nil {
-		_ = existing.Close()
-	}
-
-	// Create and start a new client
-	c, err := createMcpClient(cfg)
-	if err != nil {
-		updateMCPState(name, MCPStateError, err, nil, 0)
-		return nil, err
-	}
-
-	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := c.Start(rctx); err != nil {
-		updateMCPState(name, MCPStateError, err, nil, 0)
-		_ = c.Close()
-		return nil, err
-	}
-	if _, err := c.Initialize(rctx, mcpInitRequest); err != nil {
-		updateMCPState(name, MCPStateError, err, nil, 0)
-		_ = c.Close()
-		return nil, err
-	}
-
-	// Best-effort list tools for state/metrics; we do not rebuild wrappers here.
-	toolCount := 0
-	if res, err := c.ListTools(rctx, mcp.ListToolsRequest{}); err == nil {
-		toolCount = len(res.Tools)
-	}
-
-	mcpClients.Set(name, c)
-	updateMCPState(name, MCPStateConnected, nil, c, toolCount)
-	return c, nil
-}
-
 func runTool(ctx context.Context, name, toolName string, input string) (tools.ToolResponse, error) {
 	var args map[string]any
-	if strings.TrimSpace(input) == "" {
-		input = "{}"
-	}
 	if err := json.Unmarshal([]byte(input), &args); err != nil {
 		return tools.NewTextErrorResponse(fmt.Sprintf("error parsing parameters: %s", err)), nil
 	}
-	c, ok := mcpClients.Get(name)
-	if !ok || c == nil {
-		// Try to lazily (re)start the client once.
-		var err error
-		if c, err = restartMCPClient(ctx, name); err != nil {
-			return tools.NewTextErrorResponse("mcp '" + name + "' not available: " + err.Error()), nil
-		}
-	}
 
-	call := func(clientRef *client.Client) (*mcp.CallToolResult, error) {
-		return clientRef.CallTool(ctx, mcp.CallToolRequest{
-			Params: mcp.CallToolParams{
-				Name:      toolName,
-				Arguments: args,
-			},
-		})
+	c, err := getOrRenewClient(ctx, name)
+	if err != nil {
+		return tools.NewTextErrorResponse(err.Error()), nil
 	}
-
-	result, err := call(c)
-	if err != nil && isTransientTransportError(err) {
-		// Attempt a single restart + retry on transient transport errors
-		slog.Warn("MCP transport error, attempting restart", "name", name, "error", err)
-		if c2, rerr := restartMCPClient(ctx, name); rerr == nil {
-			if result2, err2 := call(c2); err2 == nil {
-				result = result2
-				err = nil
-			} else {
-				err = err2
-			}
-		} else {
-			// If restart fails keep original error context
-			err = fmt.Errorf("%s; restart failed: %w", err.Error(), rerr)
-		}
-	}
+	result, err := c.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      toolName,
+			Arguments: args,
+		},
+	})
 	if err != nil {
 		return tools.NewTextErrorResponse(err.Error()), nil
 	}
 
-	var output strings.Builder
+	output := make([]string, 0, len(result.Content))
 	for _, v := range result.Content {
 		if v, ok := v.(mcp.TextContent); ok {
-			output.WriteString(v.Text)
+			output = append(output, v.Text)
 		} else {
-			_, _ = fmt.Fprintf(&output, "%v: ", v)
+			output = append(output, fmt.Sprintf("%v", v))
 		}
 	}
+	return tools.NewTextResponse(strings.Join(output, "\n")), nil
+}
 
-	return tools.NewTextResponse(output.String()), nil
+func getOrRenewClient(ctx context.Context, name string) (*client.Client, error) {
+	c, ok := mcpClients.Get(name)
+	if !ok {
+		return nil, fmt.Errorf("mcp '%s' not available", name)
+	}
+
+	m := config.Get().MCP[name]
+	state, _ := mcpStates.Get(name)
+
+	pingCtx, cancel := context.WithTimeout(ctx, mcpTimeout(m))
+	defer cancel()
+	err := c.Ping(pingCtx)
+	if err == nil {
+		return c, nil
+	}
+	updateMCPState(name, MCPStateError, err, nil, state.ToolCount)
+
+	c, err = createAndInitializeClient(ctx, name, m)
+	if err != nil {
+		return nil, err
+	}
+
+	updateMCPState(name, MCPStateConnected, nil, c, state.ToolCount)
+	mcpClients.Set(name, c)
+	return c, nil
 }
 
 func (b *McpTool) Run(ctx context.Context, params tools.ToolCall) (tools.ToolResponse, error) {
@@ -285,11 +216,7 @@ func SubscribeMCPEvents(ctx context.Context) <-chan pubsub.Event[MCPEvent] {
 
 // GetMCPStates returns the current state of all MCP clients
 func GetMCPStates() map[string]MCPClientInfo {
-	states := make(map[string]MCPClientInfo)
-	for name, info := range mcpStates.Seq2() {
-		states[name] = info
-	}
-	return states
+	return maps.Collect(mcpStates.Seq2())
 }
 
 // GetMCPState returns the state of a specific MCP client
@@ -373,31 +300,12 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, mcpTimeout(m))
 			defer cancel()
-			// Save config for potential restarts on transient transport errors
-			mcpClientConfigs.Set(name, m)
-
-			c, err := createMcpClient(m)
+			c, err := createAndInitializeClient(ctx, name, m)
 			if err != nil {
-				updateMCPState(name, MCPStateError, err, nil, 0)
-				slog.Error("error creating mcp client", "error", err, "name", name)
 				return
 			}
-			if err := c.Start(ctx); err != nil {
-				updateMCPState(name, MCPStateError, err, nil, 0)
-				slog.Error("error starting mcp client", "error", err, "name", name)
-				_ = c.Close()
-				return
-			}
-			if _, err := c.Initialize(ctx, mcpInitRequest); err != nil {
-				updateMCPState(name, MCPStateError, err, nil, 0)
-				slog.Error("error initializing mcp client", "error", err, "name", name)
-				_ = c.Close()
-				return
-			}
-
-			slog.Info("Initialized mcp client", "name", name)
 			mcpClients.Set(name, c)
 
 			tools := getTools(ctx, name, permissions, c, cfg.WorkingDir())
@@ -407,6 +315,33 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 	}
 	wg.Wait()
 	return slices.Collect(result.Seq())
+}
+
+func createAndInitializeClient(ctx context.Context, name string, m config.MCPConfig) (*client.Client, error) {
+	c, err := createMcpClient(m)
+	if err != nil {
+		updateMCPState(name, MCPStateError, err, nil, 0)
+		slog.Error("error creating mcp client", "error", err, "name", name)
+		return nil, err
+	}
+	// Only call Start() for non-stdio clients, as stdio clients auto-start
+	if m.Type != config.MCPStdio {
+		if err := c.Start(ctx); err != nil {
+			updateMCPState(name, MCPStateError, err, nil, 0)
+			slog.Error("error starting mcp client", "error", err, "name", name)
+			_ = c.Close()
+			return nil, err
+		}
+	}
+	if _, err := c.Initialize(ctx, mcpInitRequest); err != nil {
+		updateMCPState(name, MCPStateError, err, nil, 0)
+		slog.Error("error initializing mcp client", "error", err, "name", name)
+		_ = c.Close()
+		return nil, err
+	}
+
+	slog.Info("Initialized mcp client", "name", name)
+	return c, nil
 }
 
 func createMcpClient(m config.MCPConfig) (*client.Client, error) {
@@ -440,3 +375,7 @@ type mcpLogger struct{}
 
 func (l mcpLogger) Errorf(format string, v ...any) { slog.Error(fmt.Sprintf(format, v...)) }
 func (l mcpLogger) Infof(format string, v ...any)  { slog.Info(fmt.Sprintf(format, v...)) }
+
+func mcpTimeout(m config.MCPConfig) time.Duration {
+	return time.Duration(cmp.Or(m.Timeout, 15)) * time.Second
+}

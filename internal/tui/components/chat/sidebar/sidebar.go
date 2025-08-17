@@ -9,23 +9,24 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/catwalk/pkg/catwalk"
-    "github.com/lacymorrow/lash/internal/config"
-    "github.com/lacymorrow/lash/internal/csync"
-    "github.com/lacymorrow/lash/internal/diff"
-    "github.com/lacymorrow/lash/internal/history"
-    "github.com/lacymorrow/lash/internal/lsp"
-    "github.com/lacymorrow/lash/internal/pubsub"
-    "github.com/lacymorrow/lash/internal/session"
-    "github.com/lacymorrow/lash/internal/tui/components/chat"
-    "github.com/lacymorrow/lash/internal/tui/components/core"
-    "github.com/lacymorrow/lash/internal/tui/components/core/layout"
-    "github.com/lacymorrow/lash/internal/tui/components/files"
-    "github.com/lacymorrow/lash/internal/tui/components/logo"
-    lspcomponent "github.com/lacymorrow/lash/internal/tui/components/lsp"
-    "github.com/lacymorrow/lash/internal/tui/components/mcp"
-    "github.com/lacymorrow/lash/internal/tui/styles"
-    "github.com/lacymorrow/lash/internal/tui/util"
-    "github.com/lacymorrow/lash/internal/version"
+	"github.com/charmbracelet/crush/internal/config"
+	"github.com/charmbracelet/crush/internal/csync"
+	"github.com/charmbracelet/crush/internal/diff"
+	"github.com/charmbracelet/crush/internal/fsext"
+	"github.com/charmbracelet/crush/internal/history"
+	"github.com/charmbracelet/crush/internal/lsp"
+	"github.com/charmbracelet/crush/internal/pubsub"
+	"github.com/charmbracelet/crush/internal/session"
+	"github.com/charmbracelet/crush/internal/tui/components/chat"
+	"github.com/charmbracelet/crush/internal/tui/components/core"
+	"github.com/charmbracelet/crush/internal/tui/components/core/layout"
+	"github.com/charmbracelet/crush/internal/tui/components/files"
+	"github.com/charmbracelet/crush/internal/tui/components/logo"
+	lspcomponent "github.com/charmbracelet/crush/internal/tui/components/lsp"
+	"github.com/charmbracelet/crush/internal/tui/components/mcp"
+	"github.com/charmbracelet/crush/internal/tui/styles"
+	"github.com/charmbracelet/crush/internal/tui/util"
+	"github.com/charmbracelet/crush/internal/version"
 	"github.com/charmbracelet/lipgloss/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -190,8 +191,8 @@ func (m *sidebarCmp) handleFileHistoryEvent(event pubsub.Event[history.File]) te
 				// If the version is not greater than the latest, we ignore it
 				continue
 			}
-			before := existing.History.initialVersion.Content
-			after := existing.History.latestVersion.Content
+			before, _ := fsext.ToUnixLineEndings(existing.History.initialVersion.Content)
+			after, _ := fsext.ToUnixLineEndings(existing.History.latestVersion.Content)
 			path := existing.History.initialVersion.Path
 			cwd := config.Get().WorkingDir()
 			path = strings.TrimPrefix(path, cwd)
@@ -248,7 +249,9 @@ func (m *sidebarCmp) loadSessionFiles() tea.Msg {
 	for path, fh := range fileMap {
 		cwd := config.Get().WorkingDir()
 		path = strings.TrimPrefix(path, cwd)
-		_, additions, deletions := diff.GenerateDiff(fh.initialVersion.Content, fh.latestVersion.Content, path)
+		before, _ := fsext.ToUnixLineEndings(fh.initialVersion.Content)
+		after, _ := fsext.ToUnixLineEndings(fh.latestVersion.Content)
+		_, additions, deletions := diff.GenerateDiff(before, after, path)
 		sessionFiles = append(sessionFiles, SessionFile{
 			History:   fh,
 			FilePath:  path,

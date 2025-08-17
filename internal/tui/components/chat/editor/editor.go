@@ -16,21 +16,20 @@ import (
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/textarea"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/crush/internal/app"
+	"github.com/charmbracelet/crush/internal/fsext"
+	"github.com/charmbracelet/crush/internal/message"
+	"github.com/charmbracelet/crush/internal/session"
+	"github.com/charmbracelet/crush/internal/tui/components/chat"
+	"github.com/charmbracelet/crush/internal/tui/components/completions"
+	"github.com/charmbracelet/crush/internal/tui/components/core/layout"
+	"github.com/charmbracelet/crush/internal/tui/components/dialogs"
+	"github.com/charmbracelet/crush/internal/tui/components/dialogs/commands"
+	"github.com/charmbracelet/crush/internal/tui/components/dialogs/filepicker"
+	"github.com/charmbracelet/crush/internal/tui/components/dialogs/quit"
+	"github.com/charmbracelet/crush/internal/tui/styles"
+	"github.com/charmbracelet/crush/internal/tui/util"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/lacymorrow/lash/internal/app"
-	"github.com/lacymorrow/lash/internal/fsext"
-	"github.com/lacymorrow/lash/internal/message"
-	"github.com/lacymorrow/lash/internal/session"
-	"github.com/lacymorrow/lash/internal/shell"
-	"github.com/lacymorrow/lash/internal/tui/components/chat"
-	"github.com/lacymorrow/lash/internal/tui/components/completions"
-	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
-	"github.com/lacymorrow/lash/internal/tui/components/dialogs"
-	"github.com/lacymorrow/lash/internal/tui/components/dialogs/commands"
-	"github.com/lacymorrow/lash/internal/tui/components/dialogs/filepicker"
-	"github.com/lacymorrow/lash/internal/tui/components/dialogs/quit"
-	"github.com/lacymorrow/lash/internal/tui/styles"
-	"github.com/lacymorrow/lash/internal/tui/util"
 )
 
 type Editor interface {
@@ -68,17 +67,6 @@ type editorCmp struct {
 	currentQuery          string
 	completionsStartIndex int
 	isCompletionsOpen     bool
-
-	// Per-session input history
-	inputHistory map[string][]string // sessionID -> history entries (most recent at end)
-	historyIndex int                 // current index into history for active session, -1 means not in history selection
-	historyTemp  string              // the current unsent input before entering history navigation
-	inHistoryNav bool                // whether we are actively navigating history
-
-	// When the first submission happens before a session exists, we temporarily
-	// store that entry and attach it to the session's history once the session
-	// is created and SetSession is called.
-	pendingFirstHistoryEntry string
 }
 
 var DeleteKeyMaps = DeleteAttachmentKeyMaps{
@@ -97,8 +85,7 @@ var DeleteKeyMaps = DeleteAttachmentKeyMaps{
 }
 
 const (
-	maxAttachments      = 5
-	maxSlashCompletions = 500
+	maxAttachments = 5
 )
 
 type OpenEditorMsg struct {
@@ -151,13 +138,6 @@ func (m *editorCmp) Init() tea.Cmd {
 }
 
 func (m *editorCmp) send() tea.Cmd {
-	if m.app.CoderAgent == nil {
-		return util.ReportError(fmt.Errorf("coder agent is not initialized"))
-	}
-	if m.app.CoderAgent.IsSessionBusy(m.session.ID) {
-		return util.ReportWarn("Agent is working, please wait...")
-	}
-
 	value := m.textarea.Value()
 	value = strings.TrimSpace(value)
 
@@ -165,31 +145,6 @@ func (m *editorCmp) send() tea.Cmd {
 	case "exit", "quit":
 		m.textarea.Reset()
 		return util.CmdHandler(dialogs.OpenDialogMsg{Model: quit.NewQuitDialog()})
-	}
-
-	// Append to global input history for cross-session navigation.
-	// Also keep existing per-session stashing behavior for backward compatibility.
-	if value != "" {
-		// Global history (app-wide, persisted)
-		_ = m.app.AppendInputHistory(value)
-
-		// Existing per-session history behavior
-		if m.session.ID == "" {
-			// Defer attaching to a specific session ID until it's created.
-			m.pendingFirstHistoryEntry = value
-		} else {
-			if m.inputHistory == nil {
-				m.inputHistory = make(map[string][]string)
-			}
-			h := m.inputHistory[m.session.ID]
-			if len(h) == 0 || h[len(h)-1] != value {
-				m.inputHistory[m.session.ID] = append(h, value)
-			}
-		}
-		// Reset history navigation state after sending
-		m.inHistoryNav = false
-		m.historyIndex = -1
-		m.historyTemp = ""
 	}
 
 	m.textarea.Reset()
@@ -319,59 +274,6 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.isCompletionsOpen && curIdx <= m.completionsStartIndex:
 			cmds = append(cmds, util.CmdHandler(completions.CloseCompletionsMsg{}))
 		}
-
-		// Clear input: ctrl+c or cmd+backspace
-		if key.Matches(msg, m.keyMap.ClearInput) && m.textarea.Focused() {
-			if strings.TrimSpace(m.textarea.Value()) != "" {
-				m.textarea.Reset()
-				// consume event so app doesn't open quit dialog
-				return m, nil
-			}
-			// empty input: open quit dialog (handled here to avoid global help flicker)
-			return m, util.CmdHandler(dialogs.OpenDialogMsg{Model: quit.NewQuitDialog()})
-		}
-
-		// History navigation: Up/Down (global, across sessions)
-		if msg.String() == "up" || msg.String() == "down" {
-			// Only handle when focused and not deleting attachments and not showing completions
-			if m.textarea.Focused() && !m.deleteMode && !m.isCompletionsOpen {
-				history := m.app.InputHistory
-				if len(history) > 0 {
-					if msg.String() == "up" {
-						// Enter history nav only if at the top line to avoid interfering with multi-line editing
-						if !m.inHistoryNav && cur != nil && cur.Y == 0 {
-							m.inHistoryNav = true
-							m.historyTemp = m.textarea.Value()
-							m.historyIndex = len(history)
-						}
-						if m.inHistoryNav {
-							if m.historyIndex > 0 {
-								m.historyIndex--
-							}
-							m.textarea.SetValue(history[m.historyIndex])
-							m.textarea.MoveToEnd()
-							return m, nil
-						}
-					} else if msg.String() == "down" {
-						if m.inHistoryNav {
-							if m.historyIndex < len(history)-1 {
-								m.historyIndex++
-								m.textarea.SetValue(history[m.historyIndex])
-							} else {
-								// Exit history navigation and restore the temp content
-								m.inHistoryNav = false
-								m.historyIndex = -1
-								m.textarea.SetValue(m.historyTemp)
-								m.historyTemp = ""
-							}
-							m.textarea.MoveToEnd()
-							return m, nil
-						}
-					}
-				}
-			}
-		}
-
 		if key.Matches(msg, DeleteKeyMaps.AttachmentDeleteMode) {
 			m.deleteMode = true
 			return m, nil
@@ -410,15 +312,10 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Handle Enter key
 		if m.textarea.Focused() && key.Matches(msg, m.keyMap.SendMessage) {
-			trimmed := strings.TrimSpace(m.textarea.Value())
-			// If no active session and input is empty, open recent sessions dialog
-			if trimmed == "" && m.session.ID == "" {
-				return m, util.CmdHandler(commands.SwitchSessionsMsg{})
-			}
 			value := m.textarea.Value()
-			if len(value) > 0 && value[len(value)-1] == '\\' {
-				// If the last character is a backslash, remove it and add a newline
-				m.textarea.SetValue(value[:len(value)-1])
+			if strings.HasSuffix(value, "\\") {
+				// If the last character is a backslash, remove it and add a newline.
+				m.textarea.SetValue(strings.TrimSuffix(value, "\\"))
 			} else {
 				// Otherwise, send the message
 				return m, m.send()
@@ -526,29 +423,14 @@ func (m *editorCmp) View() string {
 	if m.app.Permissions.SkipRequests() {
 		m.textarea.Placeholder = "Yolo mode!"
 	}
-	// Shell-like PWD near the input
-	liveCwd := shell.GetUserPersistentShell(m.app.Config().WorkingDir()).GetWorkingDir()
-	if liveCwd == "" {
-		liveCwd = m.app.Config().WorkingDir()
-	}
-	cwd := fsext.DirTrim(fsext.PrettyPath(liveCwd), 4)
-	cwdView := t.S().Base.Foreground(t.Secondary).Render(cwd)
-	// If no active session and input is empty, hint about sessions
-	if m.session.ID == "" && strings.TrimSpace(m.textarea.Value()) == "" {
-		m.textarea.Placeholder = " Press Enter for recent sessions"
-	}
 	if len(m.attachments) == 0 {
-		content := t.S().Base.Padding(0, 1, 1, 1).Render(
-			lipgloss.JoinVertical(lipgloss.Left,
-				cwdView,
-				m.textarea.View(),
-			),
+		content := t.S().Base.Padding(1).Render(
+			m.textarea.View(),
 		)
 		return content
 	}
 	content := t.S().Base.Padding(0, 1, 1, 1).Render(
 		lipgloss.JoinVertical(lipgloss.Top,
-			cwdView,
 			m.attachmentsContent(),
 			m.textarea.View(),
 		),
@@ -598,7 +480,8 @@ func (m *editorCmp) SetPosition(x, y int) tea.Cmd {
 }
 
 func (m *editorCmp) startCompletions() tea.Msg {
-	files, _, _ := fsext.ListDirectory(".", nil, maxSlashCompletions)
+	files, _, _ := fsext.ListDirectory(".", nil, 0)
+	slices.Sort(files)
 	completionItems := make([]completions.Completion, 0, len(files))
 	for _, file := range files {
 		file = strings.TrimPrefix(file, "./")
@@ -643,21 +526,6 @@ func (c *editorCmp) Bindings() []key.Binding {
 // we need to move some functionality to the page level
 func (c *editorCmp) SetSession(session session.Session) tea.Cmd {
 	c.session = session
-	// Reset transient history navigation state on session switch
-	c.inHistoryNav = false
-	c.historyIndex = -1
-	c.historyTemp = ""
-	// If we have a first entry typed before the session existed, attach it now.
-	if c.pendingFirstHistoryEntry != "" {
-		if c.inputHistory == nil {
-			c.inputHistory = make(map[string][]string)
-		}
-		history := c.inputHistory[c.session.ID]
-		if len(history) == 0 || history[len(history)-1] != c.pendingFirstHistoryEntry {
-			c.inputHistory[c.session.ID] = append(history, c.pendingFirstHistoryEntry)
-		}
-		c.pendingFirstHistoryEntry = ""
-	}
 	return nil
 }
 
@@ -708,9 +576,6 @@ func New(app *app.App) Editor {
 		app:      app,
 		textarea: ta,
 		keyMap:   DefaultEditorKeyMap(),
-		// history defaults
-		inputHistory: make(map[string][]string),
-		historyIndex: -1,
 	}
 	e.setEditorPrompt()
 
