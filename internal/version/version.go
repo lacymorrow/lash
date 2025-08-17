@@ -4,7 +4,7 @@ import "runtime/debug"
 
 // Build-time parameters set via -ldflags
 
-var Version = "4.7"
+var Version = "unknown"
 
 // A user may install lash using `go install github.com/lacymorrow/lash@latest`.
 // without -ldflags, in which case the version above is unset. As a workaround
