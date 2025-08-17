@@ -69,43 +69,43 @@ checksum:
 
 # aur_sources:
 #   - private_key: "{{ .Env.AUR_KEY }}"
-    git_url: "ssh://aur@aur.archlinux.org/lash.git"
-    makedepends:
-      - go
-      - git
-    prepare: |-
-      go mod download
-    build: |-
-      mkdir completions
-      mkdir manpages
-      export CGO_CPPFLAGS="${CPPFLAGS}"
-      export CGO_CFLAGS="${CFLAGS}"
-      export CGO_CXXFLAGS="${CXXFLAGS}"
-      export CGO_LDFLAGS="${LDFLAGS}"
-      export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-      go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=v${pkgver}" .
-      ./lash completion bash >./completions/lash.bash
-      ./lash completion zsh >./completions/lash.zsh
-      ./lash completion fish >./completions/lash.fish
-      ./lash man | gzip -c >./manpages/lash.1.gz
-    package: |-
-      # bin
-      install -Dm755 "./lash" "${pkgdir}/usr/bin/lash"
-      # license
-      mkdir -p "${pkgdir}/usr/share/licenses/lash/"
-      install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/lash/"
-      # completions
-      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
-      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
-      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-      install -Dm644 "./completions/lash.bash" "${pkgdir}/usr/share/bash-completion/completions/lash"
-      install -Dm644 "./completions/lash.zsh" "${pkgdir}/usr/share/zsh/site-functions/_lash"
-      install -Dm644 "./completions/lash.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/lash.fish"
-      # man pages
-      install -Dm644 "./manpages/lash.1.gz" "${pkgdir}/usr/share/man/man1/lash.1.gz"
-      # readme
-      mkdir -pv "${pkgdir}/usr/share/doc/lash/"
-      install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
+#     git_url: "ssh://aur@aur.archlinux.org/lash.git"
+#     makedepends:
+#       - go
+#       - git
+#     prepare: |-
+#       go mod download
+#     build: |-
+#       mkdir completions
+#       mkdir manpages
+#       export CGO_CPPFLAGS="${CPPFLAGS}"
+#       export CGO_CFLAGS="${CFLAGS}"
+#       export CGO_CXXFLAGS="${CXXFLAGS}"
+#       export CGO_LDFLAGS="${LDFLAGS}"
+#       export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+#       go build -ldflags="-w -s -buildid='' -linkmode=external -X main.version=v${pkgver}" .
+#       ./lash completion bash >./completions/lash.bash
+#       ./lash completion zsh >./completions/lash.zsh
+#       ./lash completion fish >./completions/lash.fish
+#       ./lash man | gzip -c >./manpages/lash.1.gz
+#     package: |-
+#       # bin
+#       install -Dm755 "./lash" "${pkgdir}/usr/bin/lash"
+#       # license
+#       mkdir -p "${pkgdir}/usr/share/licenses/lash/"
+#       install -Dm644 ./LICENSE* "${pkgdir}/usr/share/licenses/lash/"
+#       # completions
+#       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+#       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+#       mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+#       install -Dm644 "./completions/lash.bash" "${pkgdir}/usr/share/bash-completion/completions/lash"
+#       install -Dm644 "./completions/lash.zsh" "${pkgdir}/usr/share/zsh/site-functions/_lash"
+#       install -Dm644 "./completions/lash.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/lash.fish"
+#       # man pages
+#       install -Dm644 "./manpages/lash.1.gz" "${pkgdir}/usr/share/man/man1/lash.1.gz"
+#       # readme
+#       mkdir -pv "${pkgdir}/usr/share/doc/lash/"
+#       install -Dm644 README* "${pkgdir}/usr/share/doc/crush/"
 
 # aurs:
 #   - private_key: "{{ .Env.AUR_KEY }}"
