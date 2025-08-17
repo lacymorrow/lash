@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/catwalk/pkg/catwalk"
-	"github.com/charmbracelet/crush/internal/csync"
-	"github.com/charmbracelet/crush/internal/env"
+	"github.com/lacymorrow/lash/internal/csync"
+	"github.com/lacymorrow/lash/internal/env"
 	"github.com/tidwall/sjson"
 )
 
@@ -143,6 +143,14 @@ type Options struct {
 	DebugLSP             bool        `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
 	DisableAutoSummarize bool        `json:"disable_auto_summarize,omitempty" jsonschema:"description=Disable automatic conversation summarization,default=false"`
 	DataDirectory        string      `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data (relative to working directory),default=.crush,example=.crush"` // Relative to the cwd
+
+	// RequestTimeoutSeconds defines a global timeout for model generation requests.
+	// 0 means no timeout and requests may run until completion or manual cancel.
+	RequestTimeoutSeconds int `json:"request_timeout_seconds,omitempty" jsonschema:"description=Default timeout for model requests in seconds,minimum=0,example=180"`
+
+	// ToolCallTimeoutSeconds defines a per-tool-call timeout when tools are executed during a run.
+	// 0 means no timeout for tools.
+	ToolCallTimeoutSeconds int `json:"tool_call_timeout_seconds,omitempty" jsonschema:"description=Timeout per tool call in seconds,minimum=0,example=60"`
 }
 
 type MCPs map[string]MCPConfig
@@ -253,6 +261,9 @@ type Config struct {
 
 	Permissions *Permissions `json:"permissions,omitempty" jsonschema:"description=Permission settings for tool usage"`
 
+	// Lash contains app-specific preferences such as YOLO mode and safety toggles.
+	Lash *Lash `json:"lash,omitempty"`
+
 	// Internal
 	workingDir string `json:"-"`
 	// TODO: most likely remove this concept when I come back to it
@@ -261,6 +272,29 @@ type Config struct {
 	resolver       VariableResolver
 	dataConfigDir  string             `json:"-"`
 	knownProviders []catwalk.Provider `json:"-"`
+}
+
+// Lash holds app-specific behavior flags.
+type Lash struct {
+    // Yolo enables permissive behavior that skips permission prompts.
+    Yolo bool `json:"yolo,omitempty"`
+
+    // Safety groups safety related settings.
+    Safety LashSafety `json:"safety,omitempty"`
+}
+
+type LashSafety struct {
+    // ConfirmAgentExec controls whether the agent must ask confirmation before executing commands.
+    // If nil, defaults are applied by callers.
+    ConfirmAgentExec *bool `json:"confirm_agent_exec,omitempty"`
+}
+
+// ActiveMode returns the initial UI mode. Currently derived from YOLO.
+func (c *Config) ActiveMode() string {
+    if c != nil && c.Lash != nil && c.Lash.Yolo {
+        return "Agent"
+    }
+    return "Auto"
 }
 
 func (c *Config) WorkingDir() string {
