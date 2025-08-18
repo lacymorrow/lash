@@ -31,6 +31,9 @@ type oauthSuccessMsg struct {
 // on the OAuth screen rather than relying solely on the global status bar.
 type oauthErrorMsg struct{ err string }
 
+// oauthCancelMsg is emitted when the user cancels the OAuth flow
+type oauthCancelMsg struct{}
+
 type anthropicOAuthScreen struct {
 	handler *common.AnthropicOAuthHandler
 
@@ -46,6 +49,7 @@ type anthropicOAuthScreen struct {
 	keyOpen   key.Binding
 	keyCopy   key.Binding
 	keySubmit key.Binding
+	keyCancel key.Binding
 
 	lastOpen time.Time
 }
@@ -69,11 +73,13 @@ func newAnthropicOAuthScreen(option *dialogmodels.ModelOption, modelType config.
 		keyOpen:   key.NewBinding(key.WithKeys("o")),
 		keyCopy:   key.NewBinding(key.WithKeys("c", "y")),
 		keySubmit: key.NewBinding(key.WithKeys("enter")),
+		keyCancel: key.NewBinding(key.WithKeys("esc")),
 	}
 }
 
 func (s *anthropicOAuthScreen) Init() tea.Cmd {
 	return tea.Sequence(
+		tea.DisableMouse,
 		func() tea.Msg {
 			url, verifier, err := s.handler.StartOAuth()
 			if err != nil {
@@ -109,6 +115,8 @@ func (s *anthropicOAuthScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return s, util.ReportInfo("Auth link copied to clipboard")
 			}
 			return s, nil
+		case key.Matches(m, s.keyCancel):
+			return s, func() tea.Msg { return oauthCancelMsg{} }
 		case key.Matches(m, s.keySubmit):
 			code := strings.TrimSpace(s.codeInput.Value())
 			if code == "" {
@@ -160,7 +168,11 @@ func (s *anthropicOAuthScreen) exchangeCmd(code string) tea.Cmd {
 		if err != nil {
 			return oauthErrorMsg{err: err.Error()}
 		}
-		return util.InfoMsg{Type: util.InfoTypeInfo, Msg: "Authentication successful"}
+		return oauthSuccessMsg{
+			providerID: s.handler.ProviderID,
+			modelID:    s.handler.ModelID,
+			modelType:  s.handler.ModelType,
+		}
 	}
 }
 
@@ -171,7 +183,7 @@ func (s *anthropicOAuthScreen) View() string {
 	body := []string{
 		t.S().Base.Render("1. A browser window was opened. Sign in and approve."),
 		t.S().Base.Render("2. Press 'o' to open link, 'c/y' to copy link."),
-		t.S().Muted.Render(s.url),
+		s.url,
 		t.S().Base.Render("3. Copy the code shown (it looks like code#state)."),
 		t.S().Base.Render("4. Paste below and press Enter."),
 		"",

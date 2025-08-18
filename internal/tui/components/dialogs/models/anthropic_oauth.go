@@ -81,6 +81,7 @@ func (d *anthropicOAuthDialog) ID() dialogs.DialogID { return AnthropicOAuthDial
 func (d *anthropicOAuthDialog) Init() tea.Cmd {
 	// Build URL and open browser
 	return tea.Sequence(
+		tea.DisableMouse,
 		func() tea.Msg {
 			url, verifier, err := d.handler.StartOAuth()
 			if err != nil {
@@ -143,7 +144,7 @@ func (d *anthropicOAuthDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return d, nil
 		case key.Matches(m, d.keyMap.Cancel):
-			return d, util.CmdHandler(dialogs.CloseDialogMsg{})
+			return d, tea.Batch(tea.EnableMouseAllMotion, util.CmdHandler(dialogs.CloseDialogMsg{}))
 		case key.Matches(m, d.keyMap.Submit):
 			code := strings.TrimSpace(d.codeInput.Value())
 			if code == "" {
@@ -155,6 +156,7 @@ func (d *anthropicOAuthDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case oauthSuccessMsg:
 		// Close and propagate selection
 		return d, tea.Sequence(
+			tea.EnableMouseAllMotion,
 			util.CmdHandler(dialogs.CloseDialogMsg{}),
 			util.CmdHandler(ModelSelectedMsg{
 				Model:     config.SelectedModel{Model: m.modelID, Provider: m.providerID},

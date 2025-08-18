@@ -16,7 +16,6 @@ import (
 	"github.com/lacymorrow/lash/internal/tui/components/chat"
 	"github.com/lacymorrow/lash/internal/tui/components/core"
 	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
-	"github.com/lacymorrow/lash/internal/tui/components/dialogs"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs/models"
 	"github.com/lacymorrow/lash/internal/tui/components/logo"
 	lspcomponent "github.com/lacymorrow/lash/internal/tui/components/lsp"
@@ -73,6 +72,9 @@ type splashCmp struct {
 	selectedModel *models.ModelOption
 	isAPIKeyValid bool
 	apiKeyValue   string
+
+	// OAuth onboarding screen (page-level view)
+	oauth *anthropicOAuthScreen
 }
 
 func New() Splash {
@@ -133,11 +135,43 @@ func (s *splashCmp) SetSize(width int, height int) tea.Cmd {
 	s.listHeight = s.height - lipgloss.Height(s.logoRendered) - (SplashScreenPaddingY * 2) - s.logoGap() - 2
 	listWidth := min(60, width)
 	s.apiKeyInput.SetWidth(width - 2)
+	if s.oauth != nil {
+		// Keep OAuth screen width in sync with splash width
+		s.oauth.SetWidth(width - 2)
+	}
 	return s.modelList.SetSize(listWidth, s.listHeight)
 }
 
 // Update implements SplashPage.
 func (s *splashCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Route to OAuth screen if active to handle keys like 'o', paste, etc.
+	if s.oauth != nil {
+		switch m := msg.(type) {
+		case tea.WindowSizeMsg:
+			// Keep sizes in sync and forward the message
+			_ = s.SetSize(m.Width, m.Height)
+			model, cmd := s.oauth.Update(msg)
+			if v, ok := model.(*anthropicOAuthScreen); ok {
+				s.oauth = v
+			}
+			return s, cmd
+		case oauthSuccessMsg:
+			// OAuth completed successfully
+			s.isOnboarding = false
+			s.oauth = nil
+			return s, tea.EnableMouseAllMotion
+		case oauthCancelMsg:
+			// User cancelled OAuth - restore mouse and return to onboarding list
+			s.oauth = nil
+			return s, tea.EnableMouseAllMotion
+		default:
+			model, cmd := s.oauth.Update(msg)
+			if v, ok := model.(*anthropicOAuthScreen); ok {
+				s.oauth = v
+			}
+			return s, cmd
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return s, s.SetSize(msg.Width, msg.Height)
@@ -146,6 +180,7 @@ func (s *splashCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if s.isOnboarding {
 			// OAuth completed successfully, close onboarding
 			s.isOnboarding = false
+			s.oauth = nil
 			// The main TUI will handle setting up the model and sending OnboardingCompleteMsg
 			return s, nil
 		}
@@ -187,10 +222,12 @@ func (s *splashCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if selectedItem == nil {
 					return s, nil
 				}
-				// For Anthropic Max (Sonnet/Opus), open shared OAuth dialog when provider isn't configured
+				// For Anthropic Max (Sonnet/Opus), open OAuth onboarding as a page-level view when provider isn't configured
 				if models.IsAnthropicMaxModel(selectedItem) && !s.isProviderConfigured(string(selectedItem.Provider.ID)) {
 					s.selectedModel = selectedItem
-					return s, util.CmdHandler(dialogs.OpenDialogMsg{Model: models.NewAnthropicOAuthDialogCmp(selectedItem, config.SelectedModelTypeLarge)})
+					s.oauth = newAnthropicOAuthScreen(selectedItem, config.SelectedModelTypeLarge)
+					s.oauth.SetWidth(s.width - 2)
+					return s, s.oauth.Init()
 				}
 				if s.isProviderConfigured(string(selectedItem.Provider.ID)) {
 					cmd := s.setPreferredModel(*selectedItem)
@@ -211,7 +248,9 @@ func (s *splashCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.isAPIKeyValid = false
 					s.apiKeyValue = ""
 					s.apiKeyInput.Reset()
-					return s, util.CmdHandler(dialogs.OpenDialogMsg{Model: models.NewAnthropicOAuthDialogCmp(s.selectedModel, config.SelectedModelTypeLarge)})
+					s.oauth = newAnthropicOAuthScreen(s.selectedModel, config.SelectedModelTypeLarge)
+					s.oauth.SetWidth(s.width - 2)
+					return s, s.oauth.Init()
 				}
 				s.apiKeyValue = strings.TrimSpace(s.apiKeyInput.Value())
 				if s.apiKeyValue == "" {
@@ -444,7 +483,22 @@ func (s *splashCmp) isProviderConfigured(providerID string) bool {
 func (s *splashCmp) View() string {
 	t := styles.CurrentTheme()
 	var content string
-	if s.needsAPIKey {
+	if s.oauth != nil {
+		// Render OAuth screen as a page-level view for better selection UX
+		remainingHeight := s.height - lipgloss.Height(s.logoRendered) - (SplashScreenPaddingY * 2)
+		oauthView := t.S().Base.PaddingLeft(1).Render(s.oauth.View())
+		oauthContainer := t.S().Base.AlignVertical(lipgloss.Bottom).Height(remainingHeight).Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				oauthView,
+			),
+		)
+		content = lipgloss.JoinVertical(
+			lipgloss.Left,
+			s.logoRendered,
+			oauthContainer,
+		)
+	} else if s.needsAPIKey {
 		remainingHeight := s.height - lipgloss.Height(s.logoRendered) - (SplashScreenPaddingY * 2)
 		apiKeyView := t.S().Base.PaddingLeft(1).Render(s.apiKeyInput.View())
 		apiKeySelector := t.S().Base.AlignVertical(lipgloss.Bottom).Height(remainingHeight).Render(

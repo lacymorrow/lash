@@ -8,17 +8,17 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/v2/key"
 	tea "github.com/charmbracelet/bubbletea/v2"
-    "github.com/lacymorrow/lash/internal/app"
-    "github.com/lacymorrow/lash/internal/llm/agent"
-    "github.com/lacymorrow/lash/internal/message"
-    "github.com/lacymorrow/lash/internal/permission"
-    "github.com/lacymorrow/lash/internal/pubsub"
-    "github.com/lacymorrow/lash/internal/session"
-    "github.com/lacymorrow/lash/internal/tui/components/chat/messages"
-    "github.com/lacymorrow/lash/internal/tui/components/core/layout"
-    "github.com/lacymorrow/lash/internal/tui/exp/list"
-    "github.com/lacymorrow/lash/internal/tui/styles"
-    "github.com/lacymorrow/lash/internal/tui/util"
+	"github.com/lacymorrow/lash/internal/app"
+	"github.com/lacymorrow/lash/internal/llm/agent"
+	"github.com/lacymorrow/lash/internal/message"
+	"github.com/lacymorrow/lash/internal/permission"
+	"github.com/lacymorrow/lash/internal/pubsub"
+	"github.com/lacymorrow/lash/internal/session"
+	"github.com/lacymorrow/lash/internal/tui/components/chat/messages"
+	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
+	"github.com/lacymorrow/lash/internal/tui/exp/list"
+	"github.com/lacymorrow/lash/internal/tui/styles"
+	"github.com/lacymorrow/lash/internal/tui/util"
 )
 
 type SendMsg struct {
@@ -347,6 +347,10 @@ func (m *messageListCmp) messageExists(messageID string) bool {
 	// Search backwards as new messages are more likely to be at the end
 	for i := len(items) - 1; i >= 0; i-- {
 		if msg, ok := items[i].(messages.MessageCmp); ok && msg.GetMessage().ID == messageID {
+			return true
+		}
+		// Consider a message as existing if any of its tool calls are already present
+		if tc, ok := items[i].(messages.ToolCallCmp); ok && tc.ParentMessageID() == messageID {
 			return true
 		}
 	}
