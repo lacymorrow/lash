@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,9 +13,11 @@ import (
 	"github.com/charmbracelet/bubbles/v2/spinner"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/google/uuid"
 	"github.com/lacymorrow/lash/internal/app"
 	"github.com/lacymorrow/lash/internal/config"
 	"github.com/lacymorrow/lash/internal/history"
+	"github.com/lacymorrow/lash/internal/llm/tools"
 	"github.com/lacymorrow/lash/internal/message"
 	"github.com/lacymorrow/lash/internal/permission"
 	"github.com/lacymorrow/lash/internal/pubsub"
@@ -799,6 +802,7 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 	switch mode {
 	case "Shell":
 		sh := shell.GetUserPersistentShell(p.app.Config().WorkingDir())
+		start := time.Now().UnixMilli()
 		stdout, stderr, err := sh.Exec(context.Background(), text)
 		if err != nil {
 			if stderr == "" {
@@ -816,9 +820,38 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 			combined += "\n"
 		}
 		combined += stderr
+		// Create a tool call so the UI uses the Bash renderer formatting
+		callID := uuid.NewString()
+		bashInput, _ := json.Marshal(tools.BashParams{Command: text})
 		_, _ = p.app.Messages.Create(context.Background(), session.ID, message.CreateMessageParams{
-			Role:  message.Assistant,
-			Parts: []message.ContentPart{message.TextContent{Text: combined}},
+			Role: message.Assistant,
+			Parts: []message.ContentPart{message.ToolCall{
+				ID:       callID,
+				Name:     tools.BashToolName,
+				Input:    string(bashInput),
+				Type:     "",
+				Finished: true,
+			}},
+		})
+		metaBytes, _ := json.Marshal(tools.BashResponseMetadata{
+			StartTime:        start,
+			EndTime:          time.Now().UnixMilli(),
+			Output:           combined,
+			WorkingDirectory: sh.GetWorkingDir(),
+			UserInitiated:    true,
+		})
+		toolContent := combined
+		if toolContent == "" {
+			toolContent = tools.BashNoOutput
+		}
+		_, _ = p.app.Messages.Create(context.Background(), session.ID, message.CreateMessageParams{
+			Role: message.Tool,
+			Parts: []message.ContentPart{message.ToolResult{
+				ToolCallID: callID,
+				Content:    toolContent,
+				Metadata:   string(metaBytes),
+				IsError:    err != nil,
+			}},
 		})
 		cmds = append(cmds, p.chat.GoToBottom())
 		return tea.Batch(cmds...)
@@ -828,6 +861,7 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 		if shouldRouteToShell(strings.TrimSpace(text)) {
 			// Prefer persistent shell; synthesize output if the command succeeds but prints nothing
 			sh := shell.GetUserPersistentShell(p.app.Config().WorkingDir())
+			start := time.Now().UnixMilli()
 			stdout, stderr, err := sh.Exec(context.Background(), text)
 			if err != nil {
 				if stderr == "" {
@@ -842,7 +876,6 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 			}
 			combined += stderr
 			if combined == "" && err == nil {
-				// No visible output; provide a helpful acknowledgement
 				trimmed := strings.TrimSpace(text)
 				if strings.HasPrefix(trimmed, "cd") {
 					combined = "cwd: " + sh.GetWorkingDir()
@@ -854,9 +887,38 @@ func (p *chatPage) sendMessage(text string, attachments []message.Attachment) te
 				Role:  message.User,
 				Parts: []message.ContentPart{message.TextContent{Text: text}},
 			})
+			// Create a tool call and result so UI uses Bash renderer formatting
+			callID := uuid.NewString()
+			bashInput, _ := json.Marshal(tools.BashParams{Command: text})
 			_, _ = p.app.Messages.Create(context.Background(), session.ID, message.CreateMessageParams{
-				Role:  message.Assistant,
-				Parts: []message.ContentPart{message.TextContent{Text: combined}},
+				Role: message.Assistant,
+				Parts: []message.ContentPart{message.ToolCall{
+					ID:       callID,
+					Name:     tools.BashToolName,
+					Input:    string(bashInput),
+					Type:     "",
+					Finished: true,
+				}},
+			})
+			metaBytes, _ := json.Marshal(tools.BashResponseMetadata{
+				StartTime:        start,
+				EndTime:          time.Now().UnixMilli(),
+				Output:           combined,
+				WorkingDirectory: sh.GetWorkingDir(),
+				UserInitiated:    true,
+			})
+			toolContent := combined
+			if toolContent == "" {
+				toolContent = tools.BashNoOutput
+			}
+			_, _ = p.app.Messages.Create(context.Background(), session.ID, message.CreateMessageParams{
+				Role: message.Tool,
+				Parts: []message.ContentPart{message.ToolResult{
+					ToolCallID: callID,
+					Content:    toolContent,
+					Metadata:   string(metaBytes),
+					IsError:    err != nil,
+				}},
 			})
 			cmds = append(cmds, p.chat.GoToBottom())
 			return tea.Batch(cmds...)

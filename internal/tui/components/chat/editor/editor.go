@@ -469,10 +469,10 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *editorCmp) setEditorPrompt() {
 	if m.app.Permissions.SkipRequests() {
-		m.textarea.SetPromptFunc(4, yoloPromptFunc)
+		m.textarea.SetPromptFunc(4, m.yoloPromptFunc)
 		return
 	}
-	m.textarea.SetPromptFunc(4, normalPromptFunc)
+	m.textarea.SetPromptFunc(4, m.normalPromptFunc)
 }
 
 func (m *editorCmp) completionsPosition() (int, int) {
@@ -669,18 +669,25 @@ func (c *editorCmp) HasAttachments() bool {
 	return len(c.attachments) > 0
 }
 
-func normalPromptFunc(info textarea.PromptInfo) string {
+func (m *editorCmp) normalPromptFunc(info textarea.PromptInfo) string {
 	t := styles.CurrentTheme()
 	if info.LineNumber == 0 {
 		return "  > "
 	}
+	
+	// Only show continuation prompt if there are multiple lines
+	lines := strings.Split(m.textarea.Value(), "\n")
+	if len(lines) <= 1 {
+		return ""
+	}
+	
 	if info.Focused {
 		return t.S().Base.Foreground(t.GreenDark).Render("::: ")
 	}
 	return t.S().Muted.Render("::: ")
 }
 
-func yoloPromptFunc(info textarea.PromptInfo) string {
+func (m *editorCmp) yoloPromptFunc(info textarea.PromptInfo) string {
 	t := styles.CurrentTheme()
 	if info.LineNumber == 0 {
 		if info.Focused {
@@ -689,6 +696,13 @@ func yoloPromptFunc(info textarea.PromptInfo) string {
 			return fmt.Sprintf("%s ", t.YoloIconBlurred)
 		}
 	}
+	
+	// Only show continuation prompt if there are multiple lines
+	lines := strings.Split(m.textarea.Value(), "\n")
+	if len(lines) <= 1 {
+		return ""
+	}
+	
 	if info.Focused {
 		return fmt.Sprintf("%s ", t.YoloDotsFocused)
 	}

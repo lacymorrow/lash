@@ -6,16 +6,16 @@ import (
 	"strings"
 	"time"
 
-    "github.com/lacymorrow/lash/internal/ansiext"
-    "github.com/lacymorrow/lash/internal/fsext"
-    "github.com/lacymorrow/lash/internal/llm/agent"
-    "github.com/lacymorrow/lash/internal/llm/tools"
-    "github.com/lacymorrow/lash/internal/tui/components/core"
-    "github.com/lacymorrow/lash/internal/tui/highlight"
-    "github.com/lacymorrow/lash/internal/tui/styles"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/lipgloss/v2/tree"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lacymorrow/lash/internal/ansiext"
+	"github.com/lacymorrow/lash/internal/fsext"
+	"github.com/lacymorrow/lash/internal/llm/agent"
+	"github.com/lacymorrow/lash/internal/llm/tools"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
+	"github.com/lacymorrow/lash/internal/tui/highlight"
+	"github.com/lacymorrow/lash/internal/tui/styles"
 )
 
 // responseContextHeight limits the number of lines displayed in tool output
@@ -225,6 +225,27 @@ func (br bashRenderer) Render(v *toolCallCmp) string {
 
 		if meta.Output == "" {
 			return ""
+		}
+		if meta.UserInitiated {
+			// Render without truncation for user-initiated shell commands
+			t := styles.CurrentTheme()
+			content := strings.ReplaceAll(meta.Output, "\r\n", "\n")
+			content = strings.ReplaceAll(content, "\t", "    ")
+			lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+			width := v.textWidth() - 2
+			out := make([]string, 0, len(lines))
+			for _, ln := range lines {
+				ln = ansiext.Escape(ln)
+				ln = " " + ln
+				if len(ln) > width {
+					ln = v.fit(ln, width)
+				}
+				out = append(out, t.S().Muted.
+					Width(width).
+					Background(t.BgBaseLighter).
+					Render(ln))
+			}
+			return strings.Join(out, "\n")
 		}
 		return renderPlainContent(v, meta.Output)
 	})

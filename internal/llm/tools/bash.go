@@ -27,6 +27,7 @@ type BashResponseMetadata struct {
 	EndTime          int64  `json:"end_time"`
 	Output           string `json:"output"`
 	WorkingDirectory string `json:"working_directory"`
+	UserInitiated    bool   `json:"user_initiated,omitempty"`
 }
 type bashTool struct {
 	permissions permission.Service
