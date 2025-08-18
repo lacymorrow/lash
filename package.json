@@ -1,7 +1,7 @@
 {
   "name": "lash-cli",
   "version": "0.6.6",
-  "description": "Terminal-based AI assistant for developers. A login-shell-friendly fork of Charmbracelet Crush with Shell, Agent, and Auto modes, plus built-in MCP support.",
+  "description": "The AI Shell for developers. A login-shell-friendly fork of Charmbracelet Crush with Shell, Agent, and Auto modes, plus built-in MCP support.",
   "main": "bin/lash",
   "bin": {
     "lash": "bin/lash"
