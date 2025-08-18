@@ -32,6 +32,7 @@ import (
 	"github.com/lacymorrow/lash/internal/tui/components/chat/splash"
 	"github.com/lacymorrow/lash/internal/tui/components/completions"
 	"github.com/lacymorrow/lash/internal/tui/components/core"
+	"github.com/lacymorrow/lash/internal/tui/components/core/alert"
 	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs/commands"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs/filepicker"
@@ -107,6 +108,7 @@ type chatPage struct {
 
 	// Components
 	header  header.Header
+	alert   alert.AlertCmp
 	sidebar sidebar.Sidebar
 	chat    chat.MessageListCmp
 	editor  editor.Editor
@@ -156,6 +158,7 @@ func New(app *app.App) ChatPage {
 		app:         app,
 		keyMap:      DefaultKeyMap(),
 		header:      header.New(app.LSPClients),
+		alert:       alert.NewAlertCmp(),
 		sidebar:     sidebar.New(app.History, app.LSPClients, false),
 		chat:        chat.New(app),
 		editor:      editor.New(app),
@@ -187,6 +190,7 @@ func (p *chatPage) Init() tea.Cmd {
 
 	return tea.Batch(
 		p.header.Init(),
+		p.alert.Init(),
 		p.sidebar.Init(),
 		p.chat.Init(),
 		p.editor.Init(),
@@ -392,6 +396,13 @@ func (p *chatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		return p, tea.Batch(cmds...)
 
+	case util.InfoMsg, util.ClearStatusMsg:
+		// Route to alert component for display
+		u, cmd := p.alert.Update(msg)
+		p.alert = u.(alert.AlertCmp)
+		cmds = append(cmds, cmd)
+		return p, tea.Batch(cmds...)
+
 	case commands.CommandRunCustomMsg:
 		if p.app.CoderAgent.IsBusy() {
 			return p, util.ReportWarn("Agent is busy, please wait before executing a command...")
@@ -555,13 +566,24 @@ func (p *chatPage) View() string {
 		messagesView := p.chat.View()
 		editorView := p.editor.View()
 		headerView := p.header.View()
+		alertView := p.alert.View()
 		if p.compact {
-			chatView = lipgloss.JoinVertical(
-				lipgloss.Left,
-				headerView,
-				messagesView,
-				editorView,
-			)
+			if alertView != "" {
+				chatView = lipgloss.JoinVertical(
+					lipgloss.Left,
+					headerView,
+					alertView,
+					messagesView,
+					editorView,
+				)
+			} else {
+				chatView = lipgloss.JoinVertical(
+					lipgloss.Left,
+					headerView,
+					messagesView,
+					editorView,
+				)
+			}
 		} else {
 			sidebarView := p.sidebar.View()
 			messages := lipgloss.JoinHorizontal(
@@ -569,12 +591,22 @@ func (p *chatPage) View() string {
 				messagesView,
 				sidebarView,
 			)
-			chatView = lipgloss.JoinVertical(
-				lipgloss.Left,
-				headerView,
-				messages,
-				p.editor.View(),
-			)
+			if alertView != "" {
+				chatView = lipgloss.JoinVertical(
+					lipgloss.Left,
+					headerView,
+					alertView,
+					messages,
+					p.editor.View(),
+				)
+			} else {
+				chatView = lipgloss.JoinVertical(
+					lipgloss.Left,
+					headerView,
+					messages,
+					p.editor.View(),
+				)
+			}
 		}
 	}
 
@@ -686,6 +718,8 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 	} else {
 		if p.compact {
 			cmds = append(cmds, p.chat.SetSize(width, height-EditorHeight-HeaderHeight))
+			_, alertCmd := p.alert.Update(tea.WindowSizeMsg{Width: width, Height: 1})
+			cmds = append(cmds, alertCmd)
 			p.detailsWidth = width - DetailsPositioning
 			cmds = append(cmds, p.sidebar.SetSize(p.detailsWidth-LeftRightBorders, p.detailsHeight-TopBottomBorders))
 			cmds = append(cmds, p.editor.SetSize(width, EditorHeight))
@@ -693,6 +727,8 @@ func (p *chatPage) SetSize(width, height int) tea.Cmd {
 		} else {
 			// Non-compact: also account for header height and set header width
 			cmds = append(cmds, p.chat.SetSize(width, height-EditorHeight-HeaderHeight))
+			_, alertCmd := p.alert.Update(tea.WindowSizeMsg{Width: width, Height: 1})
+			cmds = append(cmds, alertCmd)
 			p.detailsWidth = width - DetailsPositioning
 			cmds = append(cmds, p.sidebar.SetSize(p.detailsWidth-LeftRightBorders, p.detailsHeight-TopBottomBorders))
 			cmds = append(cmds, p.editor.SetSize(width, EditorHeight))

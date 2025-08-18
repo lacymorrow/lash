@@ -674,13 +674,13 @@ func (m *editorCmp) normalPromptFunc(info textarea.PromptInfo) string {
 	if info.LineNumber == 0 {
 		return "  > "
 	}
-	
+
 	// Only show continuation prompt if there are multiple lines
 	lines := strings.Split(m.textarea.Value(), "\n")
 	if len(lines) <= 1 {
 		return ""
 	}
-	
+
 	if info.Focused {
 		return t.S().Base.Foreground(t.GreenDark).Render("::: ")
 	}
@@ -696,13 +696,13 @@ func (m *editorCmp) yoloPromptFunc(info textarea.PromptInfo) string {
 			return fmt.Sprintf("%s ", t.YoloIconBlurred)
 		}
 	}
-	
+
 	// Only show continuation prompt if there are multiple lines
 	lines := strings.Split(m.textarea.Value(), "\n")
 	if len(lines) <= 1 {
 		return ""
 	}
-	
+
 	if info.Focused {
 		return fmt.Sprintf("%s ", t.YoloDotsFocused)
 	}

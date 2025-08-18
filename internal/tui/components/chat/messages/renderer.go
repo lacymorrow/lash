@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/lipgloss/v2/tree"
@@ -227,23 +228,45 @@ func (br bashRenderer) Render(v *toolCallCmp) string {
 			return ""
 		}
 		if meta.UserInitiated {
-			// Render without truncation for user-initiated shell commands
+			// Render without truncation and wrap long single-line outputs to fit width
 			t := styles.CurrentTheme()
 			content := strings.ReplaceAll(meta.Output, "\r\n", "\n")
 			content = strings.ReplaceAll(content, "\t", "    ")
 			lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
 			width := v.textWidth() - 2
+			style := t.S().Muted.Width(width).Background(t.BgBaseLighter)
 			out := make([]string, 0, len(lines))
 			for _, ln := range lines {
 				ln = ansiext.Escape(ln)
-				ln = " " + ln
-				if len(ln) > width {
-					ln = v.fit(ln, width)
+				rest := " " + ln // left padding for each visual line
+				for {
+					if rest == "" {
+						break
+					}
+					if lipgloss.Width(rest) <= width {
+						out = append(out, style.Render(rest))
+						break
+					}
+					// compute cut index to wrap without ellipsis
+					cut := 0
+					w := 0
+					for i := 0; i < len(rest); {
+						r, size := utf8.DecodeRuneInString(rest[i:])
+						rw := lipgloss.Width(string(r))
+						if w+rw > width {
+							break
+						}
+						w += rw
+						i += size
+						cut = i
+					}
+					seg := rest[:cut]
+					out = append(out, style.Render(seg))
+					rest = rest[cut:]
+					if rest != "" && rest[0] != ' ' {
+						rest = " " + rest
+					}
 				}
-				out = append(out, t.S().Muted.
-					Width(width).
-					Background(t.BgBaseLighter).
-					Render(ln))
 			}
 			return strings.Join(out, "\n")
 		}
@@ -867,10 +890,51 @@ func renderCodeContent(v *toolCallCmp, path, content string, offset int) string 
 
 func (v *toolCallCmp) renderToolError() string {
 	t := styles.CurrentTheme()
-	err := strings.ReplaceAll(v.result.Content, "\n", " ")
 	errTag := t.S().Base.Padding(0, 1).Background(t.Red).Foreground(t.White).Render("ERROR")
-	err = fmt.Sprintf("%s %s", errTag, t.S().Base.Foreground(t.FgHalfMuted).Render(v.fit(err, v.textWidth()-2-lipgloss.Width(errTag))))
-	return err
+	content := strings.ReplaceAll(v.result.Content, "\r\n", "\n")
+	lines := strings.Split(content, "\n")
+	available := v.textWidth() - 2 - lipgloss.Width(errTag)
+	if available < 1 {
+		available = 1
+	}
+	style := t.S().Base.Foreground(t.FgHalfMuted)
+	indent := strings.Repeat(" ", lipgloss.Width(errTag)+1)
+
+	out := make([]string, 0, len(lines))
+	for i, ln := range lines {
+		rest := ln
+		firstSeg := true
+		for {
+			if rest == "" {
+				break
+			}
+			cut := 0
+			w := 0
+			for j := 0; j < len(rest); {
+				r, sz := utf8.DecodeRuneInString(rest[j:])
+				rw := lipgloss.Width(string(r))
+				if w+rw > available {
+					break
+				}
+				w += rw
+				j += sz
+				cut = j
+			}
+			seg := rest[:cut]
+			if firstSeg {
+				out = append(out, fmt.Sprintf("%s %s", errTag, style.Render(seg)))
+				firstSeg = false
+			} else {
+				out = append(out, indent+style.Render(seg))
+			}
+			rest = rest[cut:]
+		}
+		// Insert a blank continuation line between original lines when appropriate
+		if i < len(lines)-1 {
+			out = append(out, indent)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func truncateHeight(s string, h int) string {
