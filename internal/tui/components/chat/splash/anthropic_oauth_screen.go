@@ -180,17 +180,18 @@ func (s *anthropicOAuthScreen) View() string {
 	t := styles.CurrentTheme()
 	title := t.S().Base.Foreground(t.Primary).Render(s.handler.GetTitleText())
 
+	// Keep the input visible at the top; the long URL below can wrap vertically
+	input := s.codeInput.View()
 	body := []string{
-		t.S().Base.Render("1. A browser window was opened. Sign in and approve."),
-		t.S().Base.Render("2. Press 'o' to open link, 'c/y' to copy link."),
-		s.url,
-		t.S().Base.Render("3. Copy the code shown (it looks like code#state)."),
-		t.S().Base.Render("4. Paste below and press Enter."),
+		t.S().Base.Render("Open the link below and paste the code."),
+		t.S().Base.Render("Press 'o' to open link, 'c/y' to copy link."),
+
+		t.S().Muted.Render(s.url),
+		t.S().Muted.Render(""),
 		"",
 		t.S().Muted.Render("If the browser didn't open: press 'o' to open again."),
+		t.S().Muted.Render(""),
 	}
-
-	input := s.codeInput.View()
 
 	if s.status != "" {
 		body = append(body, "", t.S().Base.Render(s.status))
@@ -200,9 +201,9 @@ func (s *anthropicOAuthScreen) View() string {
 		lipgloss.Left,
 		title,
 		"",
-		strings.Join(body, "\n"),
-		"",
 		input,
+		"",
+		strings.Join(body, "\n"),
 	)
 
 	// Note: Width is managed by parent

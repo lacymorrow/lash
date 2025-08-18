@@ -159,7 +159,14 @@ func (s *splashCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// OAuth completed successfully
 			s.isOnboarding = false
 			s.oauth = nil
-			return s, tea.EnableMouseAllMotion
+			// Persist preferred model when available and then notify main TUI
+			// to complete onboarding so the editor is focused immediately.
+			if s.selectedModel != nil {
+				cmd := s.setPreferredModel(*s.selectedModel)
+				s.selectedModel = nil
+				return s, tea.Batch(cmd, util.CmdHandler(OnboardingCompleteMsg{}), tea.EnableMouseAllMotion)
+			}
+			return s, tea.Batch(util.CmdHandler(OnboardingCompleteMsg{}), tea.EnableMouseAllMotion)
 		case oauthCancelMsg:
 			// User cancelled OAuth - restore mouse and return to onboarding list
 			s.oauth = nil
