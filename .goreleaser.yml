@@ -88,6 +88,7 @@ nfpms:
       - archlinux
       - termux.deb
     file_name_template: "{{ .ConventionalFileName }}"
+    maintainer: "Lacy Morrow <me@lacymorrow.com>"
     contents:
       - src: ./completions/lash.bash
         dst: /etc/bash_completion.d/lash
