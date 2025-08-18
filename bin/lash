@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+
+const path = require('path');
+const { spawn } = require('child_process');
+
+const platform = process.platform;
+const binaryName = platform === 'win32' ? 'lash.exe' : 'lash';
+const binaryPath = path.join(__dirname, binaryName);
+
+// Check if binary exists
+const fs = require('fs');
+if (!fs.existsSync(binaryPath)) {
+  console.error('lash binary not found. Please reinstall the package.');
+  process.exit(1);
+}
+
+// Execute the binary with all arguments
+const child = spawn(binaryPath, process.argv.slice(2), {
+  stdio: 'inherit',
+  windowsHide: false
+});
+
+child.on('exit', (code) => {
+  process.exit(code);
+});
+
+child.on('error', (err) => {
+  console.error('Failed to start lash:', err.message);
+  process.exit(1);
+});
