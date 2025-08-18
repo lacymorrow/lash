@@ -139,6 +139,13 @@ brews:
       fish_completion.install "completions/lash.fish"
       man1.install "manpages/lash.1.gz"
 
+publishers:
+  - name: npm
+    cmd: npm publish --access public
+    env:
+      - NPM_TOKEN={{ .Env.NPM_TOKEN }}
+    dir: "{{ .Dir }}"
+
 
 
 changelog:

@@ -20,6 +20,13 @@ Terminal-based AI assistant for developers. A login-shell-friendly fork of Charm
 
 ### Installation
 
+NPM:
+
+```bash
+npm install -g @lacymorrow/lash
+lash --version
+```
+
 Homebrew:
 
 ```bash

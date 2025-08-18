@@ -1,0 +1,50 @@
+{
+  "name": "@lacymorrow/lash",
+  "version": "0.6.4",
+  "description": "Terminal-based AI assistant for developers. A login-shell-friendly fork of Charmbracelet Crush with Shell, Agent, and Auto modes, plus built-in MCP support.",
+  "main": "bin/lash",
+  "bin": {
+    "lash": "bin/lash"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lacymorrow/lash.git"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "terminal",
+    "cli",
+    "developer-tools",
+    "llm",
+    "mcp",
+    "shell"
+  ],
+  "author": "Lacy Morrow <me@lacymorrow.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lacymorrow/lash/issues"
+  },
+  "homepage": "https://github.com/lacymorrow/lash#readme",
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md",
+    "LICENSE.md"
+  ]
+}
