@@ -54,6 +54,9 @@ const (
 	// Default timeout for simple provider connectivity checks
 	DefaultHTTPTestTimeout = 5 * time.Second
 
+	// Default timeout for MCP initialization (handshake + tool discovery)
+	DefaultMCPInitTimeoutSeconds = 10
+
 	// UI verification spinner minimum duration to ensure visible feedback
 	VerificationMinSpinnerDuration = 750 * time.Millisecond
 
@@ -229,6 +232,10 @@ type Options struct {
 	RequestTimeoutSeconds int `json:"request_timeout_seconds,omitempty" jsonschema:"description=Max duration in seconds for a single agent request; when set, requests are canceled after this time"`
 	// Maximum duration for each individual tool call unless the tool specifies a shorter timeout. If 0, no extra per-tool cap is applied.
 	ToolCallTimeoutSeconds int `json:"tool_call_timeout_seconds,omitempty" jsonschema:"description=Max duration in seconds for each tool call unless the tool specifies a shorter timeout"`
+
+	// Maximum duration to initialize an MCP client (handshake and initial tool listing).
+	// If 0, defaults to DefaultMCPInitTimeoutSeconds.
+	MCPInitTimeoutSeconds int `json:"mcp_init_timeout_seconds,omitempty" jsonschema:"description=Max duration in seconds for MCP client initialization (handshake + list tools)"`
 }
 
 type MCPs map[string]MCPConfig

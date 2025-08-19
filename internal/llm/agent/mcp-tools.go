@@ -160,7 +160,11 @@ func restartMCPClient(ctx context.Context, name string) (*client.Client, error) 
 		return nil, err
 	}
 	// Time-bound initialization
-	rctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	initTimeout := time.Duration(config.Get().Options.MCPInitTimeoutSeconds) * time.Second
+	if initTimeout <= 0 {
+		initTimeout = time.Duration(config.DefaultMCPInitTimeoutSeconds) * time.Second
+	}
+	rctx, cancel := context.WithTimeout(context.Background(), initTimeout)
 	defer cancel()
 	if _, err := c.Initialize(rctx, mcpInitRequest); err != nil {
 		updateMCPState(name, MCPStateError, err, nil, 0)
@@ -394,7 +398,11 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 				return
 			}
 			// Bound initialization and tool discovery
-			ictx, icancel := context.WithTimeout(context.Background(), 10*time.Second)
+			initTimeout := time.Duration(config.Get().Options.MCPInitTimeoutSeconds) * time.Second
+			if initTimeout <= 0 {
+				initTimeout = time.Duration(config.DefaultMCPInitTimeoutSeconds) * time.Second
+			}
+			ictx, icancel := context.WithTimeout(context.Background(), initTimeout)
 			defer icancel()
 			if _, err := c.Initialize(ictx, mcpInitRequest); err != nil {
 				updateMCPState(name, MCPStateError, err, nil, 0)

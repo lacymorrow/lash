@@ -314,6 +314,10 @@ func (c *Config) setDefaults(workingDir string) {
 	if c.Options.DataDirectory == "" {
 		c.Options.DataDirectory = filepath.Join(workingDir, DefaultDataDirectoryName)
 	}
+	// Ensure an MCP initialization timeout default is set
+	if c.Options.MCPInitTimeoutSeconds <= 0 {
+		c.Options.MCPInitTimeoutSeconds = DefaultMCPInitTimeoutSeconds
+	}
 	if c.Providers == nil {
 		c.Providers = csync.NewMap[string, ProviderConfig]()
 	}
