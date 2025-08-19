@@ -105,18 +105,6 @@ nfpms:
       signature:
         key_file: '{{ if ne (index .Env "GPG_KEY_PATH") "" }}{{ .Env.GPG_KEY_PATH }}{{ else }}{{ end }}'
 
-signs:
-  - cmd: cosign
-    certificate: "${artifact}.pem"
-    args:
-      - sign-blob
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
-      - "${artifact}"
-      - "--yes"
-    artifacts: checksum
-    output: true
-
 source:
   enabled: true
 
