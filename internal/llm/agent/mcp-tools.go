@@ -151,13 +151,17 @@ func restartMCPClient(ctx context.Context, name string) (*client.Client, error) 
 		return nil, err
 	}
 
-	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := c.Start(rctx); err != nil {
+	// Use a long-lived context for starting the client process so it isn't tied
+	// to a short-lived timeout. Initialization and subsequent requests will use
+	// their own time-bounded contexts.
+	if err := c.Start(context.Background()); err != nil {
 		updateMCPState(name, MCPStateError, err, nil, 0)
 		_ = c.Close()
 		return nil, err
 	}
+	// Time-bound initialization
+	rctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	if _, err := c.Initialize(rctx, mcpInitRequest); err != nil {
 		updateMCPState(name, MCPStateError, err, nil, 0)
 		_ = c.Close()
@@ -373,8 +377,6 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
 			// Save config for potential restarts on transient transport errors
 			mcpClientConfigs.Set(name, m)
 
@@ -384,13 +386,17 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 				slog.Error("error creating mcp client", "error", err, "name", name)
 				return
 			}
-			if err := c.Start(ctx); err != nil {
+			// Start with a non-cancelable context so the stdio process isn't torn down by a short timeout
+			if err := c.Start(context.Background()); err != nil {
 				updateMCPState(name, MCPStateError, err, nil, 0)
 				slog.Error("error starting mcp client", "error", err, "name", name)
 				_ = c.Close()
 				return
 			}
-			if _, err := c.Initialize(ctx, mcpInitRequest); err != nil {
+			// Bound initialization and tool discovery
+			ictx, icancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer icancel()
+			if _, err := c.Initialize(ictx, mcpInitRequest); err != nil {
 				updateMCPState(name, MCPStateError, err, nil, 0)
 				slog.Error("error initializing mcp client", "error", err, "name", name)
 				_ = c.Close()
@@ -400,7 +406,7 @@ func doGetMCPTools(ctx context.Context, permissions permission.Service, cfg *con
 			slog.Info("Initialized mcp client", "name", name)
 			mcpClients.Set(name, c)
 
-			tools := getTools(ctx, name, permissions, c, cfg.WorkingDir())
+			tools := getTools(ictx, name, permissions, c, cfg.WorkingDir())
 			updateMCPState(name, MCPStateConnected, nil, c, len(tools))
 			result.Append(tools...)
 		}(name, m)
