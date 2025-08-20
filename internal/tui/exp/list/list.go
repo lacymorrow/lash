@@ -7,14 +7,14 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	tea "github.com/charmbracelet/bubbletea/v2"
-    "github.com/lacymorrow/lash/internal/csync"
-    "github.com/lacymorrow/lash/internal/tui/components/anim"
-    "github.com/lacymorrow/lash/internal/tui/components/core/layout"
-    "github.com/lacymorrow/lash/internal/tui/styles"
-    "github.com/lacymorrow/lash/internal/tui/util"
 	"github.com/charmbracelet/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lacymorrow/lash/internal/csync"
+	"github.com/lacymorrow/lash/internal/tui/components/anim"
+	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
+	"github.com/lacymorrow/lash/internal/tui/styles"
+	"github.com/lacymorrow/lash/internal/tui/util"
 	"github.com/rivo/uniseg"
 )
 
@@ -367,11 +367,13 @@ func (l *list[T]) selectionView(view string, textOnly bool) string {
 				char := rune(cellStr[0])
 				isSpecial := specialChars[cellStr]
 
-				if (isNonWhitespace(char) && !isSpecial) || cell.Style.Bg != nil {
+				// Consider as text bounds: actual visible characters that are not
+				// ignored decorations.
+				if isNonWhitespace(char) && !isSpecial {
 					if bounds.start == -1 {
 						bounds.start = x
 					}
-					bounds.end = x + 1 // Position after last character
+					bounds.end = x + 1
 				}
 			}
 		}
@@ -380,7 +382,7 @@ func (l *list[T]) selectionView(view string, textOnly bool) string {
 
 	var selectedText strings.Builder
 
-	// Second pass: apply selection highlighting
+	// Second pass: apply selection highlighting and collect text
 	for y := range scr.Height() {
 		selBounds := lineSelections[y]
 		if !selBounds.inSelection {
@@ -390,18 +392,55 @@ func (l *list[T]) selectionView(view string, textOnly bool) string {
 		textBounds := lineTextBounds[y]
 		if textBounds.start < 0 {
 			if textOnly {
-				// We don't want to get rid of all empty lines in text-only mode
+				// Preserve empty lines in text-only mode
 				selectedText.WriteByte('\n')
 			}
-
-			continue // No text on this line
+			continue
 		}
 
-		// Only scan within the intersection of text bounds and selection bounds
+		// Heuristic: skip left numeric gutters like " <digits> " at the very start
+		// of the line (used by code blocks with line numbers).
+		gutterEnd := 0
+		gx := 0
+		// skip leading spaces
+		for gx < scr.Width() {
+			c := scr.CellAt(gx, y)
+			if c == nil || c.String() != " " {
+				break
+			}
+			gx++
+		}
+		// consume digits
+		hadDigits := false
+		for gx < scr.Width() {
+			c := scr.CellAt(gx, y)
+			if c == nil {
+				break
+			}
+			s := c.String()
+			if len(s) == 1 && s[0] >= '0' && s[0] <= '9' {
+				hadDigits = true
+				gx++
+				continue
+			}
+			break
+		}
+		// one trailing space after digits marks end of gutter
+		if hadDigits && gx < scr.Width() {
+			c := scr.CellAt(gx, y)
+			if c != nil && c.String() == " " {
+				gutterEnd = gx + 1
+			}
+		}
+
 		scanStart := max(textBounds.start, selBounds.startX)
 		scanEnd := min(textBounds.end, selBounds.endX)
 
 		for x := scanStart; x < scanEnd; x++ {
+			// Skip within detected gutter range
+			if x < gutterEnd {
+				continue
+			}
 			cell := scr.CellAt(x, y)
 			if cell == nil {
 				continue
@@ -410,15 +449,12 @@ func (l *list[T]) selectionView(view string, textOnly bool) string {
 			cellStr := cell.String()
 			if len(cellStr) > 0 && !specialChars[cellStr] {
 				if textOnly {
-					// Collect selected text without styles
 					selectedText.WriteString(cell.String())
 					continue
 				}
 
-				// Text selection styling, which is a Lip Gloss style. We must
-				// extract the values to use in a UV style, below.
+				// Highlight selection
 				ts := t.TextSelection
-
 				cell = cell.Clone()
 				cell.Style = cell.Style.Background(ts.GetBackground()).Foreground(ts.GetForeground())
 				scr.SetCell(x, y, cell)
@@ -426,7 +462,6 @@ func (l *list[T]) selectionView(view string, textOnly bool) string {
 		}
 
 		if textOnly {
-			// Make sure we add a newline after each line of selected text
 			selectedText.WriteByte('\n')
 		}
 	}

@@ -38,4 +38,12 @@ var SelectionIgnoreIcons = []string{
 
 	BorderThin,
 	BorderThick,
+	"│",                // common border
+	"┃",                // heavy border
+	"┆",                // dashed border
+	"┊",                // dotted border
+	"╎",                // thin dashed border
+	"╏",                // thick dashed border
+	"╭", "╮", "╯", "╰", // rounded corners
+	"┌", "┐", "┘", "└", // square corners
 }

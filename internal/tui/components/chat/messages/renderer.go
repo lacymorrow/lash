@@ -820,8 +820,8 @@ func getDigits(n int) int {
 
 func renderCodeContent(v *toolCallCmp, path, content string, offset int) string {
 	t := styles.CurrentTheme()
-	content = strings.ReplaceAll(content, "\r\n", "\n") // Normalize line endings
-	content = strings.ReplaceAll(content, "\t", "    ") // Replace tabs with spaces
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\t", "    ")
 	truncated := truncateHeight(content, responseContextHeight)
 
 	lines := strings.Split(truncated, "\n")
@@ -829,13 +829,15 @@ func renderCodeContent(v *toolCallCmp, path, content string, offset int) string 
 		lines[i] = ansiext.Escape(ln)
 	}
 
-	bg := t.BgBase
-	highlighted, _ := highlight.SyntaxHighlight(strings.Join(lines, "\n"), path, bg)
+	// Use a lighter background for the code content area so selection logic can
+	// distinguish it from the left line-number gutter.
+	codeBg := t.BgBaseLighter
+	highlighted, _ := highlight.SyntaxHighlight(strings.Join(lines, "\n"), path, codeBg)
 	lines = strings.Split(highlighted, "\n")
 
 	if len(strings.Split(content, "\n")) > responseContextHeight {
 		lines = append(lines, t.S().Muted.
-			Background(bg).
+			Background(codeBg).
 			Render(fmt.Sprintf(" …(%d lines)", len(strings.Split(content, "\n"))-responseContextHeight)))
 	}
 
@@ -843,10 +845,11 @@ func renderCodeContent(v *toolCallCmp, path, content string, offset int) string 
 	maxDigits := getDigits(maxLineNumber)
 	numFmt := fmt.Sprintf("%%%dd", maxDigits)
 	const numPR, numPL, codePR, codePL = 1, 1, 1, 2
-	w := v.textWidth() - maxDigits - numPL - numPR - 2 // -2 for left padding
+	w := v.textWidth() - maxDigits - numPL - numPR - 2
 	for i, ln := range lines {
 		num := t.S().Base.
 			Foreground(t.FgMuted).
+			// Keep gutter on base background; content block gets lighter bg.
 			Background(t.BgBase).
 			PaddingRight(1).
 			PaddingLeft(1).
@@ -855,7 +858,7 @@ func renderCodeContent(v *toolCallCmp, path, content string, offset int) string 
 			num,
 			t.S().Base.
 				Width(w).
-				Background(bg).
+				Background(codeBg).
 				PaddingRight(1).
 				PaddingLeft(2).
 				Render(v.fit(ln, w-codePL-codePR)),

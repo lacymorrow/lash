@@ -79,9 +79,6 @@ type appModel struct {
 
 	// Active mode state for status display
 	activeMode string
-
-	// When true, Bubble Tea mouse handling is disabled, allowing native terminal text selection
-	nativeSelection bool
 }
 
 // routeToActive routes a message to the active dialog if present, otherwise to the current page.
@@ -130,13 +127,6 @@ func (a *appModel) renderLeftPrefix() string {
 		yolo := lipgloss.JoinHorizontal(lipgloss.Left, icon, " ", label)
 		left = lipgloss.JoinHorizontal(lipgloss.Left, left, "   ", yolo)
 	}
-	if a.nativeSelection {
-		t := styles.CurrentTheme()
-		base := t.S().Base.Bold(true)
-		icon := t.S().Base.Foreground(t.Secondary).Render("▌")
-		label := base.Foreground(t.Secondary).Render("Select")
-		left = lipgloss.JoinHorizontal(lipgloss.Left, left, "   ", lipgloss.JoinHorizontal(lipgloss.Left, icon, " ", label))
-	}
 	return left
 }
 
@@ -150,9 +140,7 @@ func (a *appModel) Init() tea.Cmd {
 	cmd = a.status.Init()
 	cmds = append(cmds, cmd)
 
-	if !a.nativeSelection {
-		cmds = append(cmds, tea.EnableMouseAllMotion)
-	}
+	cmds = append(cmds, tea.EnableMouseAllMotion)
 
 	// Initialize mode from config helper
 	a.activeMode = config.Get().ActiveMode()
@@ -630,14 +618,6 @@ func (a *appModel) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, a.keyMap.ToggleYolo):
 		// Route through the common handler so pages update their prompts/styles
 		return util.CmdHandler(commands.ToggleYoloModeMsg{})
-	case key.Matches(msg, a.keyMap.ToggleNativeSelection):
-		// Toggle Bubble Tea mouse handling; when disabled, native terminal text selection works
-		a.nativeSelection = !a.nativeSelection
-		a.status.SetLeft(a.renderLeftPrefix())
-		if a.nativeSelection {
-			return tea.Sequence(tea.DisableMouse, util.ReportInfo("Native selection: on"))
-		}
-		return tea.Sequence(tea.EnableMouseAllMotion, util.ReportInfo("Native selection: off"))
 	case key.Matches(msg, a.keyMap.ToggleAutoConfirm):
 		// Toggle Lash safety confirm flag at runtime and persist to config data file
 		cfg := config.Get()
