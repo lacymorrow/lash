@@ -2,6 +2,7 @@ package quit
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 // KeyMap defines the keyboard bindings for the quit dialog.
@@ -17,15 +18,15 @@ type KeyMap struct {
 func DefaultKeymap() KeyMap {
 	return KeyMap{
 		LeftRight: key.NewBinding(
-			key.WithKeys("left", "right"),
+			key.WithKeys(core.KeyLeft, core.KeyRight),
 			key.WithHelp("←/→", "switch options"),
 		),
 		EnterSpace: key.NewBinding(
-			key.WithKeys("enter", " "),
+			key.WithKeys(core.KeyEnter, core.KeySpace),
 			key.WithHelp("enter/space", "confirm"),
 		),
 		Yes: key.NewBinding(
-			key.WithKeys("y", "Y", "ctrl+c"),
+			key.WithKeys("y", "Y", core.KeyCtrlC),
 			key.WithHelp("y/Y/ctrl+c", "yes"),
 		),
 		No: key.NewBinding(
@@ -33,12 +34,12 @@ func DefaultKeymap() KeyMap {
 			key.WithHelp("n/N", "no"),
 		),
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
+			key.WithKeys(core.KeyTab),
 			key.WithHelp("tab", "switch options"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
 		),
 	}
 }

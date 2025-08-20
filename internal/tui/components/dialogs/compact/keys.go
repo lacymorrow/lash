@@ -2,6 +2,7 @@ package compact
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 // KeyMap defines the key bindings for the compact dialog.
@@ -17,24 +18,24 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		ChangeSelection: key.NewBinding(
-			key.WithKeys("tab", "left", "right", "h", "l"),
-			key.WithHelp("tab/←/→", "toggle selection"),
+			key.WithKeys(core.KeyTab, core.KeyLeft, core.KeyRight, core.KeyH, core.KeyL),
+			key.WithHelp("tab/←/→", "switch options"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys("enter"),
+			key.WithKeys(core.KeyEnter),
 			key.WithHelp("enter", "confirm"),
 		),
 		Y: key.NewBinding(
-			key.WithKeys("y"),
+			key.WithKeys(core.KeyY),
 			key.WithHelp("y", "yes"),
 		),
 		N: key.NewBinding(
-			key.WithKeys("n"),
+			key.WithKeys(core.KeyN),
 			key.WithHelp("n", "no"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
 		),
 	}
 }

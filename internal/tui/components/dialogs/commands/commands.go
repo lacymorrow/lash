@@ -52,7 +52,7 @@ type commandDialogCmp struct {
 	wHeight int // Height of the terminal window
 
 	commandList  listModel
-	keyMap       CommandsDialogKeyMap
+	keyMap       KeyMap
 	help         help.Model
 	commandType  int       // SystemCommands or UserCommands
 	userCommands []Command // User-defined commands
@@ -77,7 +77,7 @@ type (
 )
 
 func NewCommandDialog(sessionID string) CommandsDialog {
-	keyMap := DefaultCommandsDialogKeyMap()
+	keyMap := DefaultKeyMap()
 	listKeyMap := list.DefaultKeyMap()
 	listKeyMap.Down.SetEnabled(false)
 	listKeyMap.Up.SetEnabled(false)
@@ -100,7 +100,7 @@ func NewCommandDialog(sessionID string) CommandsDialog {
 	return &commandDialogCmp{
 		commandList: commandList,
 		width:       defaultWidth,
-		keyMap:      DefaultCommandsDialogKeyMap(),
+		keyMap:      DefaultKeyMap(),
 		help:        help,
 		commandType: SystemCommands,
 		sessionID:   sessionID,

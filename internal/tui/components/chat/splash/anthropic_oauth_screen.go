@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/lacymorrow/lash/internal/config"
 	"github.com/lacymorrow/lash/internal/tui/components/common"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 	dialogmodels "github.com/lacymorrow/lash/internal/tui/components/dialogs/models"
 	"github.com/lacymorrow/lash/internal/tui/styles"
 	"github.com/lacymorrow/lash/internal/tui/util"
@@ -70,10 +71,10 @@ func newAnthropicOAuthScreen(option *dialogmodels.ModelOption, modelType config.
 			ModelType:  modelType,
 		},
 		codeInput: ti,
-		keyOpen:   key.NewBinding(key.WithKeys("o")),
-		keyCopy:   key.NewBinding(key.WithKeys("c", "y")),
-		keySubmit: key.NewBinding(key.WithKeys("enter")),
-		keyCancel: key.NewBinding(key.WithKeys("esc")),
+		keyOpen:   key.NewBinding(key.WithKeys(core.KeyO)),
+		keyCopy:   key.NewBinding(key.WithKeys(core.KeyC, core.KeyY)),
+		keySubmit: key.NewBinding(key.WithKeys(core.KeyEnter)),
+		keyCancel: key.NewBinding(key.WithKeys(core.KeyEsc)),
 	}
 }
 

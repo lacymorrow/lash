@@ -15,21 +15,21 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/atotto/clipboard"
-    "github.com/lacymorrow/lash/internal/config"
-    "github.com/lacymorrow/lash/internal/message"
-    "github.com/lacymorrow/lash/internal/tui/components/anim"
-    "github.com/lacymorrow/lash/internal/tui/components/core"
-    "github.com/lacymorrow/lash/internal/tui/components/core/layout"
-    "github.com/lacymorrow/lash/internal/tui/exp/list"
-    "github.com/lacymorrow/lash/internal/tui/styles"
-    "github.com/lacymorrow/lash/internal/tui/util"
+	"github.com/lacymorrow/lash/internal/config"
+	"github.com/lacymorrow/lash/internal/message"
+	"github.com/lacymorrow/lash/internal/tui/components/anim"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
+	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
+	"github.com/lacymorrow/lash/internal/tui/exp/list"
+	"github.com/lacymorrow/lash/internal/tui/styles"
+	"github.com/lacymorrow/lash/internal/tui/util"
 )
 
 // CopyKey is the key binding for copying message content to the clipboard.
-var CopyKey = key.NewBinding(key.WithKeys("c", "y", "C", "Y"), key.WithHelp("c/y", "copy"))
+var CopyKey = key.NewBinding(key.WithKeys(core.KeyC, core.KeyY, core.KeyCapitalC, core.KeyCapitalY), key.WithHelp("c/y", "copy"))
 
 // ClearSelectionKey is the key binding for clearing the current selection in the chat interface.
-var ClearSelectionKey = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear selection"))
+var ClearSelectionKey = key.NewBinding(key.WithKeys(core.KeyEsc), key.WithHelp(core.KeyEsc, "clear selection"))
 
 // MessageCmp defines the interface for message components in the chat interface.
 // It combines standard UI model interfaces with message-specific functionality.

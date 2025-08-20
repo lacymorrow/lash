@@ -2,6 +2,7 @@ package splash
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type KeyMap struct {
@@ -12,42 +13,47 @@ type KeyMap struct {
 	No,
 	Tab,
 	LeftRight,
-	Back key.Binding
+	Back,
+	Close key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Select: key.NewBinding(
-			key.WithKeys("enter", "ctrl+y"),
+			key.WithKeys(core.KeyEnter, core.KeyCtrlY),
 			key.WithHelp("enter", "confirm"),
 		),
 		Next: key.NewBinding(
-			key.WithKeys("down", "ctrl+n"),
+			key.WithKeys(core.KeyDown, core.KeyCtrlN),
 			key.WithHelp("↓", "next item"),
 		),
 		Previous: key.NewBinding(
-			key.WithKeys("up", "ctrl+p"),
+			key.WithKeys(core.KeyUp, core.KeyCtrlP),
 			key.WithHelp("↑", "previous item"),
 		),
 		Yes: key.NewBinding(
-			key.WithKeys("y", "Y"),
-			key.WithHelp("y", "yes"),
+			key.WithKeys(core.KeyY, core.KeyCapitalY),
+			key.WithHelp("y/Y", "yes"),
 		),
 		No: key.NewBinding(
-			key.WithKeys("n", "N"),
-			key.WithHelp("n", "no"),
+			key.WithKeys(core.KeyN, core.KeyCapitalN),
+			key.WithHelp("n/N", "no"),
 		),
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch"),
+			key.WithKeys(core.KeyTab),
+			key.WithHelp("tab", "toggle"),
 		),
 		LeftRight: key.NewBinding(
-			key.WithKeys("left", "right"),
+			key.WithKeys(core.KeyLeft, core.KeyRight),
 			key.WithHelp("←/→", "switch"),
 		),
 		Back: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "back"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "back"),
+		),
+		Close: key.NewBinding(
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
 		),
 	}
 }

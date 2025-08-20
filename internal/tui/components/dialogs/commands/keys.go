@@ -2,43 +2,57 @@ package commands
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
-type CommandsDialogKeyMap struct {
+type KeyMap struct {
 	Select,
 	Next,
 	Previous,
 	Tab,
 	Close key.Binding
+
+	Confirm     key.Binding
+	NextSection key.Binding
+	PrevSection key.Binding
 }
 
-func DefaultCommandsDialogKeyMap() CommandsDialogKeyMap {
-	return CommandsDialogKeyMap{
+func DefaultKeyMap() KeyMap {
+	return KeyMap{
 		Select: key.NewBinding(
-			key.WithKeys("enter", "ctrl+y"),
+			key.WithKeys(core.KeyEnter, core.KeyCtrlY),
 			key.WithHelp("enter", "confirm"),
 		),
 		Next: key.NewBinding(
-			key.WithKeys("down", "ctrl+n"),
-			key.WithHelp("↓", "next item"),
+			key.WithKeys(core.KeyDown, core.KeyCtrlN),
+			key.WithHelp("↓", "next"),
 		),
 		Previous: key.NewBinding(
-			key.WithKeys("up", "ctrl+p"),
-			key.WithHelp("↑", "previous item"),
+			key.WithKeys(core.KeyUp, core.KeyCtrlP),
+			key.WithHelp("↑", "previous"),
 		),
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch selection"),
+			key.WithKeys(core.KeyTab),
+			key.WithHelp("tab", "move"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
+		),
+		Confirm: key.NewBinding(
+			key.WithKeys(core.KeyEnter),
+		),
+		NextSection: key.NewBinding(
+			key.WithKeys(core.KeyTab, core.KeyDown),
+		),
+		PrevSection: key.NewBinding(
+			key.WithKeys(core.KeyShiftTab, core.KeyUp),
 		),
 	}
 }
 
 // KeyBindings implements layout.KeyMapProvider
-func (k CommandsDialogKeyMap) KeyBindings() []key.Binding {
+func (k KeyMap) KeyBindings() []key.Binding {
 	return []key.Binding{
 		k.Select,
 		k.Next,
@@ -49,7 +63,7 @@ func (k CommandsDialogKeyMap) KeyBindings() []key.Binding {
 }
 
 // FullHelp implements help.KeyMap.
-func (k CommandsDialogKeyMap) FullHelp() [][]key.Binding {
+func (k KeyMap) FullHelp() [][]key.Binding {
 	m := [][]key.Binding{}
 	slice := k.KeyBindings()
 	for i := 0; i < len(slice); i += 4 {
@@ -60,11 +74,11 @@ func (k CommandsDialogKeyMap) FullHelp() [][]key.Binding {
 }
 
 // ShortHelp implements help.KeyMap.
-func (k CommandsDialogKeyMap) ShortHelp() []key.Binding {
+func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.Tab,
 		key.NewBinding(
-			key.WithKeys("down", "up"),
+			key.WithKeys(core.KeyDown, core.KeyUp),
 			key.WithHelp("↑↓", "choose"),
 		),
 		k.Select,
@@ -81,16 +95,16 @@ type ArgumentsDialogKeyMap struct {
 func DefaultArgumentsDialogKeyMap() ArgumentsDialogKeyMap {
 	return ArgumentsDialogKeyMap{
 		Confirm: key.NewBinding(
-			key.WithKeys("enter"),
+			key.WithKeys(core.KeyEnter),
 			key.WithHelp("enter", "confirm"),
 		),
 
 		Next: key.NewBinding(
-			key.WithKeys("tab", "down"),
+			key.WithKeys(core.KeyTab, core.KeyDown),
 			key.WithHelp("tab/↓", "next"),
 		),
 		Previous: key.NewBinding(
-			key.WithKeys("shift+tab", "up"),
+			key.WithKeys(core.KeyShiftTab, core.KeyUp),
 			key.WithHelp("shift+tab/↑", "previous"),
 		),
 	}

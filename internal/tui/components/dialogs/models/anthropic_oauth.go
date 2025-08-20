@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/lacymorrow/lash/internal/config"
 	"github.com/lacymorrow/lash/internal/tui/components/common"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs"
 	"github.com/lacymorrow/lash/internal/tui/styles"
 	"github.com/lacymorrow/lash/internal/tui/util"
@@ -46,10 +47,10 @@ type keyMapOAuth struct {
 
 func newKeyMapOAuth() keyMapOAuth {
 	return keyMapOAuth{
-		Submit: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit code")),
-		Open:   key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open link")),
-		Copy:   key.NewBinding(key.WithKeys("c", "y"), key.WithHelp("c/y", "copy link")),
-		Cancel: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		Submit: key.NewBinding(key.WithKeys(core.KeyEnter), key.WithHelp(core.KeyEnter, "submit code")),
+		Open:   key.NewBinding(key.WithKeys(core.KeyO), key.WithHelp(core.KeyO, "open link")),
+		Copy:   key.NewBinding(key.WithKeys(core.KeyC, core.KeyY), key.WithHelp("c/y", "copy link")),
+		Cancel: key.NewBinding(key.WithKeys(core.KeyEsc), key.WithHelp(core.KeyEsc, "cancel")),
 	}
 }
 

@@ -2,42 +2,49 @@ package completions
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type KeyMap struct {
 	Down,
 	Up,
 	Select,
-	Cancel key.Binding
-	DownInsert,
-	UpInsert key.Binding
+	Cancel,
+	Next,
+	Previous,
+	UpInsert,
+	DownInsert key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Down: key.NewBinding(
-			key.WithKeys("down"),
-			key.WithHelp("down", "move down"),
+			key.WithKeys(core.KeyDown),
+			key.WithHelp("↓", "down"),
 		),
 		Up: key.NewBinding(
-			key.WithKeys("up"),
-			key.WithHelp("up", "move up"),
+			key.WithKeys(core.KeyUp),
+			key.WithHelp("↑", "up"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys("enter", "tab", "ctrl+y"),
-			key.WithHelp("enter", "select"),
+			key.WithKeys(core.KeyEnter, core.KeyTab, core.KeyCtrlY),
+			key.WithHelp("enter/tab", "select"),
 		),
 		Cancel: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
 		),
-		DownInsert: key.NewBinding(
-			key.WithKeys("ctrl+n"),
-			key.WithHelp("ctrl+n", "insert next"),
+		Next: key.NewBinding(
+			key.WithKeys(core.KeyCtrlN),
+		),
+		Previous: key.NewBinding(
+			key.WithKeys(core.KeyCtrlP),
 		),
 		UpInsert: key.NewBinding(
-			key.WithKeys("ctrl+p"),
-			key.WithHelp("ctrl+p", "insert previous"),
+			key.WithKeys(core.KeyShiftUp),
+		),
+		DownInsert: key.NewBinding(
+			key.WithKeys(core.KeyShiftDown),
 		),
 	}
 }

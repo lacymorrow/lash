@@ -2,6 +2,7 @@ package permissions
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type KeyMap struct {
@@ -22,31 +23,31 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Left: key.NewBinding(
-			key.WithKeys("left", "h"),
+			key.WithKeys(core.KeyLeft, core.KeyH),
 			key.WithHelp("←", "previous"),
 		),
 		Right: key.NewBinding(
-			key.WithKeys("right", "l"),
+			key.WithKeys(core.KeyRight, core.KeyL),
 			key.WithHelp("→", "next"),
 		),
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
+			key.WithKeys(core.KeyTab),
 			key.WithHelp("tab", "switch"),
 		),
 		Allow: key.NewBinding(
-			key.WithKeys("a", "A", "ctrl+a"),
+			key.WithKeys(core.KeyA, core.KeyCapitalA, "ctrl+a"),
 			key.WithHelp("a", "allow"),
 		),
 		AllowSession: key.NewBinding(
-			key.WithKeys("s", "S", "ctrl+s"),
+			key.WithKeys(core.KeyS, core.KeyCapitalS, core.KeyCtrlS),
 			key.WithHelp("s", "allow session"),
 		),
 		Deny: key.NewBinding(
-			key.WithKeys("d", "D", "esc"),
+			key.WithKeys(core.KeyD, "D", core.KeyEsc),
 			key.WithHelp("d", "deny"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys("enter", "ctrl+y"),
+			key.WithKeys(core.KeyEnter, core.KeyCtrlY),
 			key.WithHelp("enter", "confirm"),
 		),
 		ToggleDiffMode: key.NewBinding(
@@ -54,19 +55,19 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("t", "toggle diff mode"),
 		),
 		ScrollDown: key.NewBinding(
-			key.WithKeys("shift+down", "J"),
+			key.WithKeys(core.KeyShiftDown, core.KeyCapitalJ),
 			key.WithHelp("shift+↓", "scroll down"),
 		),
 		ScrollUp: key.NewBinding(
-			key.WithKeys("shift+up", "K"),
+			key.WithKeys(core.KeyShiftUp, core.KeyCapitalK),
 			key.WithHelp("shift+↑", "scroll up"),
 		),
 		ScrollLeft: key.NewBinding(
-			key.WithKeys("shift+left", "H"),
+			key.WithKeys(core.KeyShiftLeft, core.KeyCapitalH),
 			key.WithHelp("shift+←", "scroll left"),
 		),
 		ScrollRight: key.NewBinding(
-			key.WithKeys("shift+right", "L"),
+			key.WithKeys(core.KeyShiftRight, core.KeyCapitalL),
 			key.WithHelp("shift+→", "scroll right"),
 		),
 	}
@@ -106,7 +107,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.ToggleDiffMode,
 		key.NewBinding(
-			key.WithKeys("shift+left", "shift+down", "shift+up", "shift+right"),
+			key.WithKeys(core.KeyShiftLeft, core.KeyShiftDown, core.KeyShiftUp, core.KeyShiftRight),
 			key.WithHelp("shift+←↓↑→", "scroll"),
 		),
 	}

@@ -2,6 +2,7 @@ package list
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type KeyMap struct {
@@ -20,43 +21,43 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Down: key.NewBinding(
-			key.WithKeys("down", "ctrl+j", "ctrl+n", "j"),
+			key.WithKeys(core.KeyDown, core.KeyCtrlJ, core.KeyCtrlN, core.KeyJ),
 			key.WithHelp("↓", "down"),
 		),
 		Up: key.NewBinding(
-			key.WithKeys("up", "ctrl+k", "ctrl+p", "k"),
+			key.WithKeys(core.KeyUp, "ctrl+k", core.KeyCtrlP, core.KeyK),
 			key.WithHelp("↑", "up"),
 		),
 		UpOneItem: key.NewBinding(
-			key.WithKeys("shift+up", "K"),
+			key.WithKeys(core.KeyShiftUp, core.KeyCapitalK),
 			key.WithHelp("shift+↑", "up one item"),
 		),
 		DownOneItem: key.NewBinding(
-			key.WithKeys("shift+down", "J"),
+			key.WithKeys(core.KeyShiftDown, core.KeyCapitalJ),
 			key.WithHelp("shift+↓", "down one item"),
 		),
 		HalfPageDown: key.NewBinding(
-			key.WithKeys("d"),
+			key.WithKeys(core.KeyD),
 			key.WithHelp("d", "half page down"),
 		),
 		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", " ", "f"),
+			key.WithKeys(core.KeyPageDown, core.KeySpace, core.KeyF),
 			key.WithHelp("f/pgdn", "page down"),
 		),
 		PageUp: key.NewBinding(
-			key.WithKeys("pgup", "b"),
+			key.WithKeys(core.KeyPageUp, core.KeyB),
 			key.WithHelp("b/pgup", "page up"),
 		),
 		HalfPageUp: key.NewBinding(
-			key.WithKeys("u"),
+			key.WithKeys(core.KeyU),
 			key.WithHelp("u", "half page up"),
 		),
 		Home: key.NewBinding(
-			key.WithKeys("g", "home"),
+			key.WithKeys(core.KeyG, core.KeyHome),
 			key.WithHelp("g", "home"),
 		),
 		End: key.NewBinding(
-			key.WithKeys("G", "end"),
+			key.WithKeys(core.KeyCapitalG, core.KeyEnd),
 			key.WithHelp("G", "end"),
 		),
 	}

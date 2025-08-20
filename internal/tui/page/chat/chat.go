@@ -951,8 +951,8 @@ func (p *chatPage) Bindings() []key.Binding {
 		cancelBinding := p.keyMap.Cancel
 		if p.isCanceling {
 			cancelBinding = key.NewBinding(
-				key.WithKeys("esc"),
-				key.WithHelp("esc", "press again to cancel"),
+				key.WithKeys(core.KeyEsc),
+				key.WithHelp(core.KeyEsc, "press again to cancel"),
 			)
 		}
 		bindings = append([]key.Binding{cancelBinding}, bindings...)
@@ -962,16 +962,16 @@ func (p *chatPage) Bindings() []key.Binding {
 	case PanelTypeChat:
 		bindings = append([]key.Binding{
 			key.NewBinding(
-				key.WithKeys("tab"),
-				key.WithHelp("tab", "focus editor"),
+				key.WithKeys(core.KeyTab),
+				key.WithHelp(core.KeyTab, "focus editor"),
 			),
 		}, bindings...)
 		bindings = append(bindings, p.chat.Bindings()...)
 	case PanelTypeEditor:
 		bindings = append([]key.Binding{
 			key.NewBinding(
-				key.WithKeys("tab"),
-				key.WithHelp("tab", "focus chat"),
+				key.WithKeys(core.KeyTab),
+				key.WithHelp(core.KeyTab, "focus chat"),
 			),
 		}, bindings...)
 		bindings = append(bindings, p.editor.Bindings()...)
@@ -990,12 +990,12 @@ func (p *chatPage) Help() help.KeyMap {
 		shortList = append(shortList,
 			// Choose model
 			key.NewBinding(
-				key.WithKeys("up", "down"),
+				key.WithKeys(core.KeyUp, core.KeyDown),
 				key.WithHelp("↑/↓", "choose"),
 			),
 			// Accept selection
 			key.NewBinding(
-				key.WithKeys("enter", "ctrl+y"),
+				key.WithKeys(core.KeyEnter, core.KeyCtrlY),
 				key.WithHelp("enter", "accept"),
 			),
 		)
@@ -1007,7 +1007,7 @@ func (p *chatPage) Help() help.KeyMap {
 		if p.splash.IsAPIKeyValid() {
 			shortList = append(shortList,
 				key.NewBinding(
-					key.WithKeys("enter"),
+					key.WithKeys(core.KeyEnter),
 					key.WithHelp("enter", "continue"),
 				),
 			)
@@ -1015,8 +1015,8 @@ func (p *chatPage) Help() help.KeyMap {
 			shortList = append(shortList,
 				// Go back
 				key.NewBinding(
-					key.WithKeys("esc"),
-					key.WithHelp("esc", "back"),
+					key.WithKeys(core.KeyEsc),
+					key.WithHelp(core.KeyEsc, "back"),
 				),
 			)
 		}
@@ -1030,15 +1030,15 @@ func (p *chatPage) Help() help.KeyMap {
 		if p.editor.IsCompletionsOpen() {
 			shortList = append(shortList,
 				key.NewBinding(
-					key.WithKeys("tab", "enter"),
+					key.WithKeys(core.KeyTab, core.KeyEnter),
 					key.WithHelp("tab/enter", "complete"),
 				),
 				key.NewBinding(
-					key.WithKeys("esc"),
-					key.WithHelp("esc", "cancel"),
+					key.WithKeys(core.KeyEsc),
+					key.WithHelp(core.KeyEsc, "cancel"),
 				),
 				key.NewBinding(
-					key.WithKeys("up", "down"),
+					key.WithKeys(core.KeyUp, core.KeyDown),
 					key.WithHelp("↑/↓", "choose"),
 				),
 			)
@@ -1049,19 +1049,19 @@ func (p *chatPage) Help() help.KeyMap {
 		}
 		if p.app.CoderAgent != nil && p.app.CoderAgent.IsBusy() {
 			cancelBinding := key.NewBinding(
-				key.WithKeys("esc"),
-				key.WithHelp("esc", "cancel"),
+				key.WithKeys(core.KeyEsc),
+				key.WithHelp(core.KeyEsc, "cancel"),
 			)
 			if p.isCanceling {
 				cancelBinding = key.NewBinding(
-					key.WithKeys("esc"),
-					key.WithHelp("esc", "press again to cancel"),
+					key.WithKeys(core.KeyEsc),
+					key.WithHelp(core.KeyEsc, "press again to cancel"),
 				)
 			}
 			if p.app.CoderAgent.QueuedPrompts(p.session.ID) > 0 {
 				cancelBinding = key.NewBinding(
-					key.WithKeys("esc"),
-					key.WithHelp("esc", "clear queue"),
+					key.WithKeys(core.KeyEsc),
+					key.WithHelp(core.KeyEsc, "clear queue"),
 				)
 			}
 			shortList = append(shortList, cancelBinding)
@@ -1075,13 +1075,13 @@ func (p *chatPage) Help() help.KeyMap {
 		// we are in a session
 		if p.session.ID != "" {
 			tabKey := key.NewBinding(
-				key.WithKeys("tab"),
-				key.WithHelp("tab", "focus chat"),
+				key.WithKeys(core.KeyTab),
+				key.WithHelp(core.KeyTab, "focus chat"),
 			)
 			if p.focusedPane == PanelTypeChat {
 				tabKey = key.NewBinding(
-					key.WithKeys("tab"),
-					key.WithHelp("tab", "focus editor"),
+					key.WithKeys(core.KeyTab),
+					key.WithHelp(core.KeyTab, "focus editor"),
 				)
 			}
 			shortList = append(shortList, tabKey)
@@ -1139,7 +1139,7 @@ func (p *chatPage) Help() help.KeyMap {
 		case PanelTypeChat:
 			shortList = append(shortList,
 				key.NewBinding(
-					key.WithKeys("up", "down"),
+					key.WithKeys(core.KeyUp, core.KeyDown),
 					key.WithHelp("↑↓", "scroll"),
 				),
 				messages.CopyKey,
@@ -1147,37 +1147,37 @@ func (p *chatPage) Help() help.KeyMap {
 			fullList = append(fullList,
 				[]key.Binding{
 					key.NewBinding(
-						key.WithKeys("up", "down"),
+						key.WithKeys(core.KeyUp, core.KeyDown),
 						key.WithHelp("↑↓", "scroll"),
 					),
 					key.NewBinding(
-						key.WithKeys("shift+up", "shift+down"),
+						key.WithKeys(core.KeyShiftUp, core.KeyShiftDown),
 						key.WithHelp("shift+↑↓", "next/prev item"),
 					),
 					key.NewBinding(
-						key.WithKeys("pgup", "b"),
+						key.WithKeys(core.KeyPageUp, core.KeyB),
 						key.WithHelp("b/pgup", "page up"),
 					),
 					key.NewBinding(
-						key.WithKeys("pgdown", " ", "f"),
+						key.WithKeys(core.KeyPageDown, core.KeySpace, core.KeyF),
 						key.WithHelp("f/pgdn", "page down"),
 					),
 				},
 				[]key.Binding{
 					key.NewBinding(
-						key.WithKeys("u"),
+						key.WithKeys(core.KeyU),
 						key.WithHelp("u", "half page up"),
 					),
 					key.NewBinding(
-						key.WithKeys("d"),
+						key.WithKeys(core.KeyD),
 						key.WithHelp("d", "half page down"),
 					),
 					key.NewBinding(
-						key.WithKeys("g", "home"),
+						key.WithKeys(core.KeyG, core.KeyHome),
 						key.WithHelp("g", "home"),
 					),
 					key.NewBinding(
-						key.WithKeys("G", "end"),
+						key.WithKeys(core.KeyCapitalG, core.KeyEnd),
 						key.WithHelp("G", "end"),
 					),
 				},
@@ -1188,22 +1188,22 @@ func (p *chatPage) Help() help.KeyMap {
 			)
 		case PanelTypeEditor:
 			newLineBinding := key.NewBinding(
-				key.WithKeys("shift+enter", "ctrl+j"),
+				key.WithKeys(core.KeyShiftEnter, core.KeyCtrlJ),
 				key.WithHelp("shift+enter", "newline"),
 			)
 			fullList = append(fullList,
 				[]key.Binding{
 					newLineBinding,
 					key.NewBinding(
-						key.WithKeys("ctrl+f"),
+						key.WithKeys(core.KeyCtrlF),
 						key.WithHelp("ctrl+f", "add image"),
 					),
 					key.NewBinding(
-						key.WithKeys("/"),
+						key.WithKeys(core.KeySlash),
 						key.WithHelp("/", "add file"),
 					),
 					key.NewBinding(
-						key.WithKeys("ctrl+o"),
+						key.WithKeys(core.KeyCtrlO),
 						key.WithHelp("ctrl+o", "open editor"),
 					),
 				})
@@ -1211,15 +1211,15 @@ func (p *chatPage) Help() help.KeyMap {
 			if p.editor.HasAttachments() {
 				fullList = append(fullList, []key.Binding{
 					key.NewBinding(
-						key.WithKeys("ctrl+r"),
+						key.WithKeys(core.KeyCtrlR),
 						key.WithHelp("ctrl+r+{i}", "delete attachment at index i"),
 					),
 					key.NewBinding(
-						key.WithKeys("ctrl+r", "r"),
+						key.WithKeys(core.KeyCtrlR, core.KeyR),
 						key.WithHelp("ctrl+r+r", "delete all attachments"),
 					),
 					key.NewBinding(
-						key.WithKeys("esc"),
+						key.WithKeys(core.KeyEsc),
 						key.WithHelp("esc", "cancel delete mode"),
 					),
 				})
@@ -1231,8 +1231,8 @@ func (p *chatPage) Help() help.KeyMap {
 		)
 		fullList = append(fullList, []key.Binding{
 			key.NewBinding(
-				key.WithKeys("ctrl+g"),
-				key.WithHelp("ctrl+g", "less"),
+				key.WithKeys(core.KeyCtrlG),
+				key.WithHelp(core.KeyCtrlG, "less"),
 			),
 		})
 

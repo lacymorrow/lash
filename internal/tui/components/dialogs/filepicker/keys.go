@@ -2,9 +2,9 @@ package filepicker
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
-// KeyMap defines keyboard bindings for dialog management.
 type KeyMap struct {
 	Select,
 	Down,
@@ -12,34 +12,38 @@ type KeyMap struct {
 	Forward,
 	Backward,
 	Close key.Binding
+
+	Scroll key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Select: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "accept"),
+			key.WithKeys(core.KeyEnter),
+			key.WithHelp("enter", "select"),
 		),
 		Down: key.NewBinding(
-			key.WithKeys("down", "j"),
-			key.WithHelp("down/j", "move down"),
+			key.WithKeys(core.KeyDown, core.KeyJ),
+			key.WithHelp("↓", "down"),
 		),
 		Up: key.NewBinding(
-			key.WithKeys("up", "k"),
-			key.WithHelp("up/k", "move up"),
+			key.WithKeys(core.KeyUp, core.KeyK),
+			key.WithHelp("↑", "up"),
 		),
 		Forward: key.NewBinding(
-			key.WithKeys("right", "l"),
-			key.WithHelp("right/l", "move forward"),
+			key.WithKeys(core.KeyRight, core.KeyL),
+			key.WithHelp("→", "open dir"),
 		),
 		Backward: key.NewBinding(
-			key.WithKeys("left", "h"),
-			key.WithHelp("left/h", "move backward"),
+			key.WithKeys(core.KeyLeft, core.KeyH),
+			key.WithHelp("←", "go back"),
 		),
-
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "close/exit"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
+		),
+		Scroll: key.NewBinding(
+			key.WithKeys(core.KeyRight, core.KeyL, core.KeyLeft, core.KeyH, core.KeyUp, core.KeyK, core.KeyDown, core.KeyJ),
 		),
 	}
 }
@@ -70,10 +74,10 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 // ShortHelp implements help.KeyMap.
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(
-			key.WithKeys("right", "l", "left", "h", "up", "k", "down", "j"),
-			key.WithHelp("↑↓←→", "navigate"),
-		),
+		k.Forward,
+		k.Backward,
+		k.Up,
+		k.Down,
 		k.Select,
 		k.Close,
 	}

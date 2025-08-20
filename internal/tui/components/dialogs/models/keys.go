@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type KeyMap struct {
@@ -18,24 +19,24 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Select: key.NewBinding(
-			key.WithKeys("enter", "ctrl+y"),
+			key.WithKeys(core.KeyEnter, core.KeyCtrlY),
 			key.WithHelp("enter", "confirm"),
 		),
 		Next: key.NewBinding(
-			key.WithKeys("down", "ctrl+n"),
+			key.WithKeys(core.KeyDown, core.KeyCtrlN),
 			key.WithHelp("↓", "next item"),
 		),
 		Previous: key.NewBinding(
-			key.WithKeys("up", "ctrl+p"),
+			key.WithKeys(core.KeyUp, core.KeyCtrlP),
 			key.WithHelp("↑", "previous item"),
 		),
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
+			key.WithKeys(core.KeyTab),
 			key.WithHelp("tab", "toggle type"),
 		),
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
+			key.WithKeys(core.KeyEsc),
+			key.WithHelp(core.KeyEsc, "cancel"),
 		),
 	}
 }
@@ -75,7 +76,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 	}
 	return []key.Binding{
 		key.NewBinding(
-			key.WithKeys("down", "up"),
+			key.WithKeys(core.KeyDown, core.KeyUp),
 			key.WithHelp("↑↓", "choose"),
 		),
 		k.Tab,

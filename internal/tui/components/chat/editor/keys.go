@@ -2,6 +2,7 @@ package editor
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 type EditorKeyMap struct {
@@ -15,24 +16,24 @@ type EditorKeyMap struct {
 func DefaultEditorKeyMap() EditorKeyMap {
 	return EditorKeyMap{
 		AddFile: key.NewBinding(
-			key.WithKeys("/"),
-			key.WithHelp("/", "add file"),
+			key.WithKeys(core.KeySlash),
+			key.WithHelp(core.KeySlash, "add file"),
 		),
 		SendMessage: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "send"),
+			key.WithKeys(core.KeyEnter),
+			key.WithHelp(core.KeyEnter, "send"),
 		),
 		OpenEditor: key.NewBinding(
-			key.WithKeys("ctrl+o"),
-			key.WithHelp("ctrl+o", "open editor"),
+			key.WithKeys(core.KeyCtrlO),
+			key.WithHelp(core.KeyCtrlO, "open editor"),
 		),
 		Newline: key.NewBinding(
-			key.WithKeys("shift+enter", "ctrl+j"),
+			key.WithKeys(core.KeyShiftEnter, core.KeyCtrlJ),
 			key.WithHelp("shift+enter", "newline"),
 		),
 		ClearInput: key.NewBinding(
-			key.WithKeys("ctrl+c"),
-			key.WithHelp("ctrl+c", "clear input"),
+			key.WithKeys(core.KeyCtrlC),
+			key.WithHelp(core.KeyCtrlC, "clear input"),
 		),
 	}
 }
@@ -60,15 +61,15 @@ type DeleteAttachmentKeyMaps struct {
 // TODO: update this to use the new keymap concepts
 var AttachmentsKeyMaps = DeleteAttachmentKeyMaps{
 	AttachmentDeleteMode: key.NewBinding(
-		key.WithKeys("ctrl+r"),
+		key.WithKeys(core.KeyCtrlR),
 		key.WithHelp("ctrl+r+{i}", "delete attachment at index i"),
 	),
 	Escape: key.NewBinding(
-		key.WithKeys("esc", "ctrl+c"),
+		key.WithKeys(core.KeyEsc, core.KeyCtrlC),
 		key.WithHelp("esc/ctrl+c", "cancel delete mode"),
 	),
 	DeleteAllAttachments: key.NewBinding(
-		key.WithKeys("r"),
+		key.WithKeys(core.KeyR),
 		key.WithHelp("ctrl+r+r", "delete all attachments"),
 	),
 }

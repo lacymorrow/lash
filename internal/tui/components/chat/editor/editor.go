@@ -24,6 +24,7 @@ import (
 	"github.com/lacymorrow/lash/internal/shell"
 	"github.com/lacymorrow/lash/internal/tui/components/chat"
 	"github.com/lacymorrow/lash/internal/tui/components/completions"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 	"github.com/lacymorrow/lash/internal/tui/components/core/layout"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs"
 	"github.com/lacymorrow/lash/internal/tui/components/dialogs/commands"
@@ -83,15 +84,15 @@ type editorCmp struct {
 
 var DeleteKeyMaps = DeleteAttachmentKeyMaps{
 	AttachmentDeleteMode: key.NewBinding(
-		key.WithKeys("ctrl+r"),
+		key.WithKeys(core.KeyCtrlR),
 		key.WithHelp("ctrl+r+{i}", "delete attachment at index i"),
 	),
 	Escape: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "cancel delete mode"),
+		key.WithKeys(core.KeyEsc),
+		key.WithHelp(core.KeyEsc, "cancel delete mode"),
 	),
 	DeleteAllAttachments: key.NewBinding(
-		key.WithKeys("r"),
+		key.WithKeys(core.KeyR),
 		key.WithHelp("ctrl+r+r", "delete all attachments"),
 	),
 }

@@ -2,6 +2,7 @@ package dialogs
 
 import (
 	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/lacymorrow/lash/internal/tui/components/core"
 )
 
 // KeyMap defines keyboard bindings for dialog management.
@@ -12,7 +13,7 @@ type KeyMap struct {
 func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Close: key.NewBinding(
-			key.WithKeys("esc"),
+			key.WithKeys(core.KeyEsc),
 		),
 	}
 }
