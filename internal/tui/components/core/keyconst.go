@@ -12,6 +12,7 @@ const (
 	KeyCtrlSpace  = "ctrl+space"
 	KeyShiftTab   = "shift+tab"
 	KeyCtrlY      = "ctrl+y"
+	KeyCtrlX      = "ctrl+x"
 	KeyTab        = "tab"
 	KeyEsc        = "esc"
 	KeyEnter      = "enter"
@@ -30,4 +31,5 @@ const (
 	HelpMode        = "mode"
 	HelpAutoConfirm = "auto-confirm"
 	HelpYolo        = "yolo"
+	HelpSelect      = "select"
 )

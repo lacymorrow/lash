@@ -1131,6 +1131,10 @@ func (p *chatPage) Help() help.KeyMap {
 				key.WithKeys(core.KeyCtrlY),
 				key.WithHelp(core.KeyCtrlY, core.HelpAutoConfirm),
 			),
+			key.NewBinding(
+				key.WithKeys(core.KeyCtrlX),
+				key.WithHelp(core.KeyCtrlX, core.HelpSelect),
+			),
 		)
 		// Commands is omitted from short help; available under More
 		fullList = append(fullList, globalBindings)

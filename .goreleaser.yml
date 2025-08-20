@@ -21,6 +21,7 @@ before:
     - sh -c 'go run . completion zsh >./completions/lash.zsh'
     - sh -c 'go run . completion fish >./completions/lash.fish'
     - sh -c 'go run . man | gzip -c >./manpages/lash.1.gz'
+    - sh -c "if [ -f package.json ]; then node -e 'const fs=require(\"fs\"); const p=JSON.parse(fs.readFileSync(\"package.json\", \"utf8\")); p.version=\"{{ .Version }}\".replace(/^v/, \"\"); fs.writeFileSync(\"package.json\", JSON.stringify(p, null, 2) + \"\\n\");'; fi"
 
 # gomod:
 #   proxy: true

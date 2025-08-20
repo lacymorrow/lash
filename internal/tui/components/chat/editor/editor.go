@@ -324,8 +324,8 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, m.keyMap.ClearInput) && m.textarea.Focused() {
 			if strings.TrimSpace(m.textarea.Value()) != "" {
 				m.textarea.Reset()
-				// consume event so app doesn't open quit dialog
-				return m, nil
+				// consume event so app doesn't open quit dialog by returning a non-nil no-op command
+				return m, func() tea.Msg { return nil }
 			}
 			// empty input: open quit dialog (handled here to avoid global help flicker)
 			return m, util.CmdHandler(dialogs.OpenDialogMsg{Model: quit.NewQuitDialog()})
@@ -674,13 +674,13 @@ func (m *editorCmp) normalPromptFunc(info textarea.PromptInfo) string {
 	if info.LineNumber == 0 {
 		return "  > "
 	}
-	
+
 	// Only show continuation prompt if there are multiple lines
 	lines := strings.Split(m.textarea.Value(), "\n")
 	if len(lines) <= 1 {
 		return ""
 	}
-	
+
 	if info.Focused {
 		return t.S().Base.Foreground(t.GreenDark).Render("::: ")
 	}
@@ -696,13 +696,13 @@ func (m *editorCmp) yoloPromptFunc(info textarea.PromptInfo) string {
 			return fmt.Sprintf("%s ", t.YoloIconBlurred)
 		}
 	}
-	
+
 	// Only show continuation prompt if there are multiple lines
 	lines := strings.Split(m.textarea.Value(), "\n")
 	if len(lines) <= 1 {
 		return ""
 	}
-	
+
 	if info.Focused {
 		return fmt.Sprintf("%s ", t.YoloDotsFocused)
 	}

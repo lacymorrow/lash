@@ -22,6 +22,9 @@ type KeyMap struct {
 	// YOLO
 	ToggleYolo key.Binding
 
+	// Selection/Mouse
+	ToggleNativeSelection key.Binding
+
 	pageBindings []key.Binding
 }
 
@@ -68,6 +71,12 @@ func DefaultKeyMap() KeyMap {
 		ToggleYolo: key.NewBinding(
 			key.WithKeys(core.KeyShiftTab),
 			key.WithHelp(core.KeyShiftTab, core.HelpYolo),
+		),
+
+		// Toggle native selection (Ctrl+X)
+		ToggleNativeSelection: key.NewBinding(
+			key.WithKeys(core.KeyCtrlX),
+			key.WithHelp(core.KeyCtrlX, core.HelpSelect),
 		),
 	}
 }
