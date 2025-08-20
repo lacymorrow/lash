@@ -320,7 +320,7 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, util.CmdHandler(completions.CloseCompletionsMsg{}))
 		}
 
-		// Clear input: ctrl+c or cmd+backspace
+		// Clear input: ctrl+c
 		if key.Matches(msg, m.keyMap.ClearInput) && m.textarea.Focused() {
 			if strings.TrimSpace(m.textarea.Value()) != "" {
 				m.textarea.Reset()
@@ -329,6 +329,73 @@ func (m *editorCmp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// empty input: open quit dialog (handled here to avoid global help flicker)
 			return m, util.CmdHandler(dialogs.OpenDialogMsg{Model: quit.NewQuitDialog()})
+		}
+
+		// Platform-aware deletion shortcuts
+		if m.textarea.Focused() {
+			s := msg.String()
+			// macOS: cmd+backspace deletes to start of line; option+backspace deletes previous word
+			if runtime.GOOS == "darwin" && (s == "cmd+backspace" || s == "alt+backspace") {
+				val := m.textarea.Value()
+				cur := m.textarea.Cursor()
+				if cur != nil {
+					// Approximate linear index from visual cursor position
+					idx := m.textarea.Width()*cur.Y + cur.X
+					if idx > len(val) {
+						idx = len(val)
+					} else if idx < 0 {
+						idx = 0
+					}
+					if s == "cmd+backspace" {
+						// Delete from start of current line to cursor
+						start := strings.LastIndex(val[:idx], "\n") + 1
+						if start < 0 {
+							start = 0
+						}
+						newVal := val[:start] + val[idx:]
+						if newVal != val {
+							m.textarea.SetValue(newVal)
+							return m, nil
+						}
+					} else {
+						// alt+backspace: delete previous word
+						i := idx
+						for i > 0 && unicode.IsSpace(rune(val[i-1])) {
+							i--
+						}
+						for i > 0 && !unicode.IsSpace(rune(val[i-1])) {
+							i--
+						}
+						if i < idx {
+							newVal := val[:i] + val[idx:]
+							m.textarea.SetValue(newVal)
+							return m, nil
+						}
+					}
+				}
+			}
+			// Windows/Linux: ctrl+backspace deletes to start of line
+			if runtime.GOOS != "darwin" && s == "ctrl+backspace" {
+				val := m.textarea.Value()
+				cur := m.textarea.Cursor()
+				if cur != nil {
+					idx := m.textarea.Width()*cur.Y + cur.X
+					if idx > len(val) {
+						idx = len(val)
+					} else if idx < 0 {
+						idx = 0
+					}
+					start := strings.LastIndex(val[:idx], "\n") + 1
+					if start < 0 {
+						start = 0
+					}
+					newVal := val[:start] + val[idx:]
+					if newVal != val {
+						m.textarea.SetValue(newVal)
+						return m, nil
+					}
+				}
+			}
 		}
 
 		// History navigation: Up/Down (global, across sessions)

@@ -31,7 +31,7 @@ func DefaultEditorKeyMap() EditorKeyMap {
 			key.WithHelp("shift+enter", "newline"),
 		),
 		ClearInput: key.NewBinding(
-			key.WithKeys("ctrl+c", "cmd+backspace"),
+			key.WithKeys("ctrl+c"),
 			key.WithHelp("ctrl+c", "clear input"),
 		),
 	}
