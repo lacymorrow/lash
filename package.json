@@ -1,13 +1,14 @@
 {
   "name": "lash-cli",
-  "version": "0.6.6",
+  "version": "0.6.11",
   "description": "The AI Shell for developers. A login-shell-friendly fork of Charmbracelet Crush with Shell, Agent, and Auto modes, plus built-in MCP support.",
   "main": "bin/lash",
   "bin": {
     "lash": "bin/lash"
   },
   "scripts": {
-    "postinstall": "node scripts/install.js"
+    "postinstall": "node scripts/install.js",
+    "release": "git tag -a v$(node -p \"require('./package.json').version\") -m \"Release $(node -p \"require('./package.json').version\")\" && git push origin v$(node -p \"require('./package.json').version\")"
   },
   "repository": {
     "type": "git",
