@@ -172,37 +172,95 @@ await Bun.file(`./dist/lash-cli/bin/lash.cmd`).write(windowsWrapper)
 
 // Create postinstall script
 const postinstallScript = `#!/usr/bin/env node
-const { existsSync } = require('fs');
-const { join } = require('path');
+import fs from "fs"
+import path from "path"
+import os from "os"
+import { fileURLToPath } from "url"
+import { createRequire } from "module"
 
-const platform = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
-const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : process.arch;
-const packageName = \`lash-cli-\${platform}-\${arch}\`;
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 
-console.log(\`Checking for platform-specific package: \${packageName}\`);
+function detectPlatformAndArch() {
+  // Map platform names
+  let platform
+  switch (os.platform()) {
+    case "darwin":
+      platform = "darwin"
+      break
+    case "linux":
+      platform = "linux"
+      break
+    case "win32":
+      platform = "windows"
+      break
+    default:
+      platform = os.platform()
+      break
+  }
 
-// The platform-specific package should be installed as an optional dependency
-// We just need to verify it exists
-const searchPaths = [
-  join(__dirname, '..', packageName, 'bin', platform === 'windows' ? 'lash.exe' : 'lash'),
-  join(__dirname, '..', '..', packageName, 'bin', platform === 'windows' ? 'lash.exe' : 'lash'),
-  join(__dirname, 'node_modules', packageName, 'bin', platform === 'windows' ? 'lash.exe' : 'lash')
-];
+  // Map architecture names
+  let arch
+  switch (os.arch()) {
+    case "x64":
+      arch = "x64"
+      break
+    case "arm64":
+      arch = "arm64"
+      break
+    case "arm":
+      arch = "arm"
+      break
+    default:
+      arch = os.arch()
+      break
+  }
 
-let found = false;
-for (const path of searchPaths) {
-  if (existsSync(path)) {
-    console.log(\`✓ Found platform binary at: \${path}\`);
-    found = true;
-    break;
+  return { platform, arch }
+}
+
+function findBinary() {
+  const { platform, arch } = detectPlatformAndArch()
+  const packageName = \`lash-cli-\${platform}-\${arch}\`
+  const binary = platform === "windows" ? "lash.exe" : "lash"
+
+  try {
+    // Use require.resolve to find the package
+    const packageJsonPath = require.resolve(\`\${packageName}/package.json\`)
+    const packageDir = path.dirname(packageJsonPath)
+    const binaryPath = path.join(packageDir, "bin", binary)
+
+    if (!fs.existsSync(binaryPath)) {
+      throw new Error(\`Binary not found at \${binaryPath}\`)
+    }
+
+    return binaryPath
+  } catch (error) {
+    throw new Error(\`Could not find package \${packageName}: \${error.message}\`)
   }
 }
 
-if (!found) {
-  console.log(\`Platform package \${packageName} will be installed as an optional dependency.\`);
-  console.log('If installation fails, you can manually install it with:');
-  console.log(\`  npm install \${packageName}\`);
+function main() {
+  try {
+    const binaryPath = findBinary()
+    const binScript = path.join(__dirname, "bin", "lash")
+
+    // Remove existing bin script if it exists
+    if (fs.existsSync(binScript)) {
+      fs.unlinkSync(binScript)
+    }
+
+    // Create symlink to the actual binary
+    fs.symlinkSync(binaryPath, binScript, 'file')
+    fs.chmodSync(binScript, '755')
+    console.log(\`lash binary symlinked: \${binScript} -> \${binaryPath}\`)
+  } catch (error) {
+    console.error("Failed to create lash binary symlink:", error.message)
+    process.exit(1)
+  }
 }
+
+main()
 `
 
 await Bun.file(`./dist/lash-cli/postinstall.mjs`).write(postinstallScript)
@@ -225,7 +283,7 @@ await Bun.file(`./dist/lash-cli/package.json`).write(
       license: "MIT",
       repository: {
         type: "git",
-        url: "https://github.com/lacymorrow/opencode"
+        url: "https://github.com/lacymorrow/lash"
       },
       optionalDependencies,
       engines: {
