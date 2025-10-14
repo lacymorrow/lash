@@ -82,14 +82,46 @@ async function main() {
       await $`git tag -a v${newVersion} -m "Release v${newVersion}"`
       console.log(`✓ Created tag v${newVersion}`)
     }
+
+    // Push changes and tag
+    console.log("Pushing changes and tag to remote...")
+    await $`git push origin main`
+    await $`git push origin v${newVersion}`
+    console.log("✓ Pushed to remote")
+
+    // Create GitHub Release
+    const githubToken = process.env["GITHUB_TOKEN"]
+    if (githubToken) {
+      console.log("Creating GitHub release...")
+      const releaseResponse = await fetch(`https://api.github.com/repos/lacymorrow/lash/releases`, {
+        method: "POST",
+        headers: {
+          Authorization: `token ${githubToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/vnd.github+json",
+        },
+        body: JSON.stringify({
+          tag_name: `v${newVersion}`,
+          name: `v${newVersion}`,
+          draft: false,
+          prerelease: newVersion.includes("-"),
+        }),
+      })
+
+      if (releaseResponse.ok) {
+        console.log("✓ GitHub release created successfully")
+      } else {
+        const errorBody = await releaseResponse.text()
+        console.error("✗ Failed to create GitHub release:", releaseResponse.status, errorBody)
+      }
+    } else {
+      console.log("\nSkipping GitHub release creation (no GITHUB_TOKEN found).")
+    }
     
-    console.log("\n✨ Release prepared!")
-    console.log("\nTo publish the release:")
-    console.log(`  git push origin main`)
-    console.log(`  git push origin v${newVersion}`)
-    console.log("\nThis will trigger the GitHub Actions workflow to:")
+    console.log("\n✨ Release prepared and pushed!")
+    console.log("\nThis should trigger the GitHub Actions workflow to:")
     console.log("  - Build binaries for all platforms")
-    console.log("  - Create a GitHub release")
+    console.log("  - Attach binaries to the GitHub release")
     console.log("  - Publish to npm")
     
   } catch (error) {
