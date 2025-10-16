@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.6.16",
+  "version": "0.15.3",
   "name": "lash-cli",
   "description": "lash - The AI coding agent built for the terminal",
   "type": "module",
@@ -8,17 +8,10 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "dev": "bun run --conditions=development ./src/index.ts",
-    "build:dev": "mkdir -p dist/dev && cd ../tui && go build -ldflags='-s -w -X main.Version=dev' -o ../opencode/dist/dev/tui ./cmd/opencode/main.go && cd ../opencode && bun build --define OPENCODE_VERSION='dev' --compile --target=bun --outfile=dist/dev/lash ./src/index.ts --embed ./dist/dev/tui && rm dist/dev/tui",
-    "build": "bun run ./script/build-binaries.ts",
-    "prepublishOnly": "bun run ./script/prepare-npm.ts",
-    "release": "bun run ./script/release.ts",
-    "release:major": "bun run ./script/release.ts major",
-    "release:minor": "bun run ./script/release.ts minor",
-    "release:patch": "bun run ./script/release.ts patch",
-    "publish:lash": "bun run ./script/publish-lash.ts",
-    "publish:lash:dry": "DRY_RUN=true bun run ./script/publish-lash.ts"
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test",
+    "build": "./script/build.ts",
+    "dev": "bun run ./src/index.ts"
   },
   "bin": {
     "lash": "./bin/lash"
@@ -43,29 +36,40 @@
   },
   "devDependencies": {
     "@ai-sdk/amazon-bedrock": "2.2.10",
+    "@ai-sdk/google-vertex": "3.0.16",
     "@octokit/webhooks-types": "7.6.1",
+    "@parcel/watcher-win32-x64": "2.5.1",
     "@standard-schema/spec": "1.0.0",
-    "@tsconfig/bun": "1.0.7",
-    "@types/bun": "latest",
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
     "@types/turndown": "5.0.5",
     "@types/yargs": "17.0.33",
-    "typescript": "^5.8.2",
+    "typescript": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "vscode-languageserver-types": "3.17.5",
-    "zod-to-json-schema": "3.24.5"
+    "zod-to-json-schema": "3.24.5",
+    "@opencode-ai/script": "workspace:*"
   },
   "dependencies": {
     "@clack/prompts": "1.0.0-alpha.1",
-    "@hono/zod-validator": "0.4.2",
+    "@hono/standard-validator": "0.1.5",
+    "@hono/zod-validator": "catalog:",
     "@modelcontextprotocol/sdk": "1.15.1",
-    "@openauthjs/openauth": "0.4.3",
+    "@openauthjs/openauth": "catalog:",
+    "@opencode-ai/plugin": "workspace:*",
+    "@opencode-ai/script": "workspace:*",
+    "@opencode-ai/sdk": "workspace:*",
+    "@parcel/watcher": "2.5.1",
     "@standard-schema/spec": "1.0.0",
     "@zip.js/zip.js": "2.7.62",
-    "ai": "5.0.8",
+    "ai": "catalog:",
+    "chokidar": "4.0.3",
     "decimal.js": "10.5.0",
-    "diff": "8.0.2",
+    "diff": "catalog:",
+    "fuzzysort": "3.1.0",
     "gray-matter": "4.0.3",
-    "hono": "4.7.10",
-    "hono-openapi": "0.4.8",
+    "hono": "catalog:",
+    "hono-openapi": "1.0.7",
     "ignore": "7.0.5",
     "jsonc-parser": "3.3.1",
     "minimatch": "10.0.3",
@@ -79,7 +83,6 @@
     "web-tree-sitter": "0.22.6",
     "xdg-basedir": "5.1.0",
     "yargs": "18.0.0",
-    "zod": "3.25.76",
-    "zod-openapi": "4.1.0"
+    "zod": "catalog:"
   }
 }

@@ -369,6 +369,9 @@ func (m *messagesComponent) renderView() tea.Cmd {
 		lastAssistantMessage := "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 		for _, msg := range slices.Backward(m.app.Messages) {
 			if assistant, ok := msg.Info.(opencode.AssistantMessage); ok {
+				if assistant.Time.Completed > 0 {
+					break
+				}
 				lastAssistantMessage = assistant.ID
 				break
 			}
@@ -665,7 +668,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 					error = err.Data.Message
 				}
 
-				if !hasContent && error == "" && !reverted {
+				if !hasContent && error == "" && !reverted && casted.Time.Completed == 0 {
 					content = renderText(
 						m.app,
 						message.Info,
@@ -896,8 +899,8 @@ func (m *messagesComponent) renderHeader() string {
 					continue
 				}
 				tokens = (usage.Input +
-					usage.Cache.Write +
 					usage.Cache.Read +
+					usage.Cache.Write +
 					usage.Output +
 					usage.Reasoning)
 			}

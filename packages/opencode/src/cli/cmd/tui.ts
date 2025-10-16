@@ -1,7 +1,6 @@
 import { Global } from "../../global"
 import { Provider } from "../../provider/provider"
 import { Server } from "../../server/server"
-import { bootstrap } from "../bootstrap"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
 import path from "path"
@@ -10,12 +9,12 @@ import { Installation } from "../../installation"
 import { Config } from "../../config/config"
 import { Bus } from "../../bus"
 import { Log } from "../../util/log"
-import { FileWatcher } from "../../file/watch"
 import { Ide } from "../../ide"
 
 import { Flag } from "../../flag/flag"
 import { Session } from "../../session"
-import { Instance } from "../../project/instance"
+import { $ } from "bun"
+import { bootstrap } from "../bootstrap"
 
 declare global {
   const OPENCODE_TUI_PATH: string
@@ -100,7 +99,6 @@ export const TuiCommand = cmd({
           }
           return undefined
         })()
-        FileWatcher.init()
         const providers = await Provider.list()
         if (Object.keys(providers).length === 0) {
           return "needs_provider"
@@ -111,57 +109,27 @@ export const TuiCommand = cmd({
           hostname: args.hostname,
         })
 
+        let cmd = [] as string[]
         const tui = Bun.embeddedFiles.find((item) => (item as File).name.includes("tui")) as File
-        if (!tui) {
-          if (Installation.isDev()) {
-            // In development mode, fall back to Go source if TUI binary not embedded
-            UI.println("TUI binary not embedded, using Go source (development mode)")
-            const cmd = ["go", "run", "./main.go"]
-            const cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/opencode", import.meta.url))
-            Log.Default.info("tui", { cmd, cwd })
-            const proc = Bun.spawn({
-              cmd: [
-                ...cmd,
-                ...(args.model ? ["--model", args.model] : []),
-                ...(args.prompt ? ["--prompt", args.prompt] : []),
-                ...(args.agent ? ["--agent", args.agent] : []),
-                ...(sessionID ? ["--session", sessionID] : []),
-              ],
-              cwd,
-              stdout: "inherit",
-              stderr: "inherit",
-              stdin: "inherit",
-              env: {
-                ...process.env,
-                CGO_ENABLED: "0",
-                OPENCODE_SERVER: server.url.toString(),
-                OPENCODE_PROJECT: JSON.stringify(Instance.project),
-              },
-              onExit: () => {
-                server.stop()
-              },
-            })
-            await proc.exited
-            server.stop()
-            return "done"
-          } else {
-            UI.error("TUI binary not found in embedded files. This is a build issue.")
-            UI.error("Please try installing from source or report this issue.")
-            return "done"
+        if (tui) {
+          let binaryName = tui.name
+          if (process.platform === "win32" && !binaryName.endsWith(".exe")) {
+            binaryName += ".exe"
           }
+          const binary = path.join(Global.Path.cache, "tui", binaryName)
+          const file = Bun.file(binary)
+          if (!(await file.exists())) {
+            await Bun.write(file, tui, { mode: 0o755 })
+            if (process.platform !== "win32") await fs.chmod(binary, 0o755)
+          }
+          cmd = [binary]
         }
-        
-        let binaryName = tui.name
-        if (process.platform === "win32" && !binaryName.endsWith(".exe")) {
-          binaryName += ".exe"
+        if (!tui) {
+          const dir = Bun.fileURLToPath(new URL("../../../../tui/cmd/opencode", import.meta.url))
+          let binaryName = `./dist/tui${process.platform === "win32" ? ".exe" : ""}`
+          await $`go build -o ${binaryName} ./main.go`.cwd(dir)
+          cmd = [path.join(dir, binaryName)]
         }
-        const binary = path.join(Global.Path.cache, "tui", binaryName)
-        const file = Bun.file(binary)
-        if (!(await file.exists())) {
-          await Bun.write(file, tui, { mode: 0o755 })
-          await fs.chmod(binary, 0o755)
-        }
-        const cmd = [binary]
         Log.Default.info("tui", {
           cmd,
         })
@@ -173,7 +141,7 @@ export const TuiCommand = cmd({
             ...(args.agent ? ["--agent", args.agent] : []),
             ...(sessionID ? ["--session", sessionID] : []),
           ],
-          cwd: process.cwd(),
+          cwd,
           stdout: "inherit",
           stderr: "inherit",
           stdin: "inherit",
@@ -181,7 +149,6 @@ export const TuiCommand = cmd({
             ...process.env,
             CGO_ENABLED: "0",
             OPENCODE_SERVER: server.url.toString(),
-            OPENCODE_PROJECT: JSON.stringify(Instance.project),
           },
           onExit: () => {
             server.stop()
@@ -189,8 +156,7 @@ export const TuiCommand = cmd({
         })
 
         ;(async () => {
-          if (Installation.isDev()) return
-          if (Installation.isSnapshot()) return
+          // if (Installation.isLocal()) return
           const config = await Config.global()
           if (config.autoupdate === false || Flag.OPENCODE_DISABLE_AUTOUPDATE) return
           const latest = await Installation.latest().catch(() => {})
@@ -247,7 +213,7 @@ function getOpencodeCommand(): string[] {
 
   const execPath = process.execPath.toLowerCase()
 
-  if (Installation.isDev()) {
+  if (Installation.isLocal()) {
     // In development, use bun to run the TypeScript entry point
     return [execPath, "run", process.argv[1]]
   }

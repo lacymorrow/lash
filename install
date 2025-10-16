@@ -44,7 +44,7 @@ INSTALL_DIR=$HOME/.lash/bin
 mkdir -p "$INSTALL_DIR"
 
 if [ -z "$requested_version" ]; then
-    # Use the fixed version with embedded TUI
+    # Use the fixed version with embedded TUI (lash-specific)
     specific_version="0.6.12-fixed"
     url="https://github.com/lacymorrow/lash/releases/download/v${specific_version}/$filename"
 else

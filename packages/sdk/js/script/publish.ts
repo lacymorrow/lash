@@ -1,21 +1,23 @@
 #!/usr/bin/env bun
 
+import { Script } from "@opencode-ai/script"
+import { $ } from "bun"
+
 const dir = new URL("..", import.meta.url).pathname
 process.chdir(dir)
 
-import { $ } from "bun"
-import { question } from "zx"
+await import("./build")
 
-await import("./generate")
-await rm -rf dist`
-await bun tsc`
-
-const snapshot = process.env["OPENCODE_SNAPSHOT"] === "true"
-const otp = process.env["NPM_TOKEN"] ? "" : `--otp=${await question("NPM one-time password: ")}`
-
-if (snapshot) {
-  await bun publish --tag snapshot ${otp}`
+const pkg = await import("../package.json").then((m) => m.default)
+const original = JSON.parse(JSON.stringify(pkg))
+for (const [key, value] of Object.entries(pkg.exports)) {
+  const file = value.replace("./src/", "./dist/").replace(".ts", "")
+  /// @ts-expect-error
+  pkg.exports[key] = {
+    import: file + ".js",
+    types: file + ".d.ts",
+  }
 }
-if (!snapshot) {
-  await bun publish ${otp}`
-}
+await Bun.write("package.json", JSON.stringify(pkg, null, 2))
+await $`bun publish --tag ${Script.channel} --access public`
+await Bun.write("package.json", JSON.stringify(original, null, 2))
