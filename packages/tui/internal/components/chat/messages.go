@@ -660,6 +660,8 @@ func (m *messagesComponent) renderView() tea.Cmd {
 				case nil:
 				case opencode.AssistantMessageErrorMessageOutputLengthError:
 					error = "Message output length exceeded"
+				case opencode.AssistantMessageErrorAPIError:
+					error = err.Data.Message
 				case opencode.ProviderAuthError:
 					error = err.Data.Message
 				case opencode.MessageAbortedError:

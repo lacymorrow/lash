@@ -266,22 +266,14 @@ func SetClipboard(text string) tea.Cmd {
 	return tea.Sequence(cmds...)
 }
 
-func (a *App) cycleMode(forward bool) (*App, tea.Cmd) {
-	if forward {
-		a.AgentIndex++
-		if a.AgentIndex >= len(a.Agents) {
-			a.AgentIndex = 0
-		}
-	} else {
-		a.AgentIndex--
-		if a.AgentIndex < 0 {
-			a.AgentIndex = len(a.Agents) - 1
-		}
-	}
-	if a.Agent().Mode == "subagent" {
-		return a.cycleMode(forward)
-	}
+func (a *App) updateModelForNewAgent() {
+	singleModelEnv := os.Getenv("OPENCODE_AGENTS_SWITCH_SINGLE_MODEL")
+	isSingleModel := singleModelEnv == "1" || singleModelEnv == "true"
 
+	if isSingleModel {
+		return
+	}
+	// Set up model for the new agent
 	modelID := a.Agent().Model.ModelID
 	providerID := a.Agent().Model.ProviderID
 	if modelID == "" {
@@ -305,6 +297,25 @@ func (a *App) cycleMode(forward bool) (*App, tea.Cmd) {
 			}
 		}
 	}
+}
+
+func (a *App) cycleMode(forward bool) (*App, tea.Cmd) {
+	if forward {
+		a.AgentIndex++
+		if a.AgentIndex >= len(a.Agents) {
+			a.AgentIndex = 0
+		}
+	} else {
+		a.AgentIndex--
+		if a.AgentIndex < 0 {
+			a.AgentIndex = len(a.Agents) - 1
+		}
+	}
+	if a.Agent().Mode == "subagent" {
+		return a.cycleMode(forward)
+	}
+
+	a.updateModelForNewAgent()
 
 	a.State.Agent = a.Agent().Name
 	a.State.UpdateAgentUsage(a.Agent().Name)
@@ -393,30 +404,7 @@ func (a *App) SwitchToAgent(agentName string) (*App, tea.Cmd) {
 		}
 	}
 
-	// Set up model for the new agent
-	modelID := a.Agent().Model.ModelID
-	providerID := a.Agent().Model.ProviderID
-	if modelID == "" {
-		if model, ok := a.State.AgentModel[a.Agent().Name]; ok {
-			modelID = model.ModelID
-			providerID = model.ProviderID
-		}
-	}
-
-	if modelID != "" {
-		for _, provider := range a.Providers {
-			if provider.ID == providerID {
-				a.Provider = &provider
-				for _, model := range provider.Models {
-					if model.ID == modelID {
-						a.Model = &model
-						break
-					}
-				}
-				break
-			}
-		}
-	}
+	a.updateModelForNewAgent()
 
 	a.State.Agent = a.Agent().Name
 	a.State.UpdateAgentUsage(agentName)
@@ -515,19 +503,7 @@ func (a *App) InitializeProvider() tea.Cmd {
 		}
 	}
 
-	// Priority 2: Config file model setting
-	if selectedProvider == nil && a.Config.Model != "" {
-		if provider, model := findModelByFullID(providers, a.Config.Model); provider != nil &&
-			model != nil {
-			selectedProvider = provider
-			selectedModel = model
-			slog.Debug("Selected model from config", "provider", provider.ID, "model", model.ID)
-		} else {
-			slog.Debug("Config model not found", "model", a.Config.Model)
-		}
-	}
-
-	// Priority 3: Current agent's preferred model
+	// Priority 2: Current agent's preferred model
 	if selectedProvider == nil && a.Agent().Model.ModelID != "" {
 		if provider, model := findModelByProviderAndModelID(providers, a.Agent().Model.ProviderID, a.Agent().Model.ModelID); provider != nil &&
 			model != nil {
@@ -544,6 +520,18 @@ func (a *App) InitializeProvider() tea.Cmd {
 			)
 		} else {
 			slog.Debug("Agent model not found", "provider", a.Agent().Model.ProviderID, "model", a.Agent().Model.ModelID, "agent", a.Agent().Name)
+		}
+	}
+
+	// Priority 3: Config file model setting
+	if selectedProvider == nil && a.Config.Model != "" {
+		if provider, model := findModelByFullID(providers, a.Config.Model); provider != nil &&
+			model != nil {
+			selectedProvider = provider
+			selectedModel = model
+			slog.Debug("Selected model from config", "provider", provider.ID, "model", model.ID)
+		} else {
+			slog.Debug("Config model not found", "model", a.Config.Model)
 		}
 	}
 

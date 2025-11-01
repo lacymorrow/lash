@@ -1,11 +1,17 @@
 import { Log } from "../util/log"
 import { Bus } from "../bus"
-import { describeRoute, generateSpecs, validator, resolver, openAPIRouteHandler } from "hono-openapi"
+import {
+  describeRoute,
+  generateSpecs,
+  validator,
+  resolver,
+  openAPIRouteHandler,
+} from "hono-openapi"
 import { Hono } from "hono"
 import { cors } from "hono/cors"
-import { streamSSE } from "hono/streaming"
+import { stream, streamSSE } from "hono/streaming"
 import { Session } from "../session"
-import z from "zod/v4"
+import z from "zod"
 import { Provider } from "../provider/provider"
 import { mapValues } from "remeda"
 import { NamedError } from "../util/error"
@@ -15,7 +21,7 @@ import { Config } from "../config/config"
 import { File } from "../file"
 import { LSP } from "../lsp"
 import { MessageV2 } from "../session/message-v2"
-import { callTui, TuiRoute } from "./tui"
+import { TuiRoute } from "./tui"
 import { Permission } from "../permission"
 import { Instance } from "../project/instance"
 import { Agent } from "../agent/agent"
@@ -35,6 +41,9 @@ import { InstanceBootstrap } from "../project/bootstrap"
 import { MCP } from "../mcp"
 import { Storage } from "../storage/storage"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
+import { TuiEvent } from "@/cli/cmd/tui/event"
+import { Snapshot } from "@/snapshot"
+import { SessionSummary } from "@/session/summary"
 
 const ERRORS = {
   400: {
@@ -59,9 +68,7 @@ const ERRORS = {
     description: "Not found",
     content: {
       "application/json": {
-        schema: resolver(
-          Storage.NotFoundError.Schema
-        )
+        schema: resolver(Storage.NotFoundError.Schema),
       },
     },
   },
@@ -87,12 +94,9 @@ export namespace Server {
         })
         if (err instanceof NamedError) {
           let status: ContentfulStatusCode
-          if (err instanceof Storage.NotFoundError)
-            status = 404
-          else if (err instanceof Provider.ModelNotFoundError)
-            status = 400
-          else
-            status = 500
+          if (err instanceof Storage.NotFoundError) status = 404
+          else if (err instanceof Provider.ModelNotFoundError) status = 400
+          else status = 500
           return c.json(err.toObject(), { status })
         }
         const message = err instanceof Error && err.stack ? err.stack : err.toString()
@@ -251,7 +255,9 @@ export namespace Server {
               id: t.id,
               description: t.description,
               // Handle both Zod schemas and plain JSON schemas
-              parameters: (t.parameters as any)?._def ? zodToJsonSchema(t.parameters as any) : t.parameters,
+              parameters: (t.parameters as any)?._def
+                ? zodToJsonSchema(t.parameters as any)
+                : t.parameters,
             })),
           )
         },
@@ -449,7 +455,11 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          await Session.remove(c.req.valid("param").id)
+          const sessionID = c.req.valid("param").id
+          await Session.remove(sessionID)
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "session.list",
+          })
           return c.json(true)
         },
       )
@@ -613,6 +623,44 @@ export namespace Server {
           return c.json(session)
         },
       )
+      .get(
+        "/session/:id/diff",
+        describeRoute({
+          description: "Get the diff that resulted from this user message",
+          operationId: "session.diff",
+          responses: {
+            200: {
+              description: "Successfully retrieved diff",
+              content: {
+                "application/json": {
+                  schema: resolver(Snapshot.FileDiff.array()),
+                },
+              },
+            },
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: SessionSummary.diff.schema.shape.sessionID,
+          }),
+        ),
+        validator(
+          "query",
+          z.object({
+            messageID: SessionSummary.diff.schema.shape.messageID,
+          }),
+        ),
+        async (c) => {
+          const query = c.req.valid("query")
+          const params = c.req.valid("param")
+          const result = await SessionSummary.diff({
+            sessionID: params.id,
+            messageID: query.messageID,
+          })
+          return c.json(result)
+        },
+      )
       .delete(
         "/session/:id/share",
         describeRoute({
@@ -739,7 +787,10 @@ export namespace Server {
         ),
         async (c) => {
           const params = c.req.valid("param")
-          const message = await Session.getMessage({ sessionID: params.id, messageID: params.messageID })
+          const message = await Session.getMessage({
+            sessionID: params.id,
+            messageID: params.messageID,
+          })
           return c.json(message)
         },
       )
@@ -773,10 +824,14 @@ export namespace Server {
         ),
         validator("json", SessionPrompt.PromptInput.omit({ sessionID: true })),
         async (c) => {
-          const sessionID = c.req.valid("param").id
-          const body = c.req.valid("json")
-          const msg = await SessionPrompt.prompt({ ...body, sessionID })
-          return c.json(msg)
+          c.status(200)
+          c.header("Content-Type", "application/json")
+          return stream(c, async (stream) => {
+            const sessionID = c.req.valid("param").id
+            const body = c.req.valid("json")
+            const msg = await SessionPrompt.prompt({ ...body, sessionID })
+            stream.write(JSON.stringify(msg))
+          })
         },
       )
       .post(
@@ -873,7 +928,10 @@ export namespace Server {
         async (c) => {
           const id = c.req.valid("param").id
           log.info("revert", c.req.valid("json"))
-          const session = await SessionRevert.revert({ sessionID: id, ...c.req.valid("json") })
+          const session = await SessionRevert.revert({
+            sessionID: id,
+            ...c.req.valid("json"),
+          })
           return c.json(session)
         },
       )
@@ -934,7 +992,11 @@ export namespace Server {
           const params = c.req.valid("param")
           const id = params.id
           const permissionID = params.permissionID
-          Permission.respond({ sessionID: id, permissionID, response: c.req.valid("json").response })
+          Permission.respond({
+            sessionID: id,
+            permissionID,
+            response: c.req.valid("json").response,
+          })
           return c.json(true)
         },
       )
@@ -984,7 +1046,10 @@ export namespace Server {
           const providers = await Provider.list().then((x) => mapValues(x, (item) => item.info))
           return c.json({
             providers: Object.values(providers),
-            default: mapValues(providers, (item) => Provider.sort(Object.values(item.models))[0].id),
+            default: mapValues(
+              providers,
+              (item) => Provider.sort(Object.values(item.models))[0].id,
+            ),
           })
         },
       )
@@ -1241,7 +1306,7 @@ export namespace Server {
               description: "MCP server status",
               content: {
                 "application/json": {
-                  schema: resolver(z.any()),
+                  schema: resolver(z.record(z.string(), MCP.Status)),
                 },
               },
             },
@@ -1249,6 +1314,26 @@ export namespace Server {
         }),
         async (c) => {
           return c.json(await MCP.status())
+        },
+      )
+      .get(
+        "/lsp",
+        describeRoute({
+          description: "Get LSP server status",
+          operationId: "lsp.status",
+          responses: {
+            200: {
+              description: "LSP server status",
+              content: {
+                "application/json": {
+                  schema: resolver(LSP.Status.array()),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          return c.json(await LSP.status())
         },
       )
       .post(
@@ -1268,13 +1353,11 @@ export namespace Server {
             ...errors(400),
           },
         }),
-        validator(
-          "json",
-          z.object({
-            text: z.string(),
-          }),
-        ),
-        async (c) => c.json(await callTui(c)),
+        validator("json", TuiEvent.PromptAppend.properties),
+        async (c) => {
+          await Bus.publish(TuiEvent.PromptAppend, c.req.valid("json"))
+          return c.json(true)
+        },
       )
       .post(
         "/tui/open-help",
@@ -1292,7 +1375,10 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          // TODO: open dialog
+          return c.json(true)
+        },
       )
       .post(
         "/tui/open-sessions",
@@ -1310,7 +1396,12 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "session.list",
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/open-themes",
@@ -1328,7 +1419,12 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "session.list",
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/open-models",
@@ -1346,7 +1442,12 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "model.list",
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/submit-prompt",
@@ -1364,7 +1465,12 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "prompt.submit",
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/clear-prompt",
@@ -1382,7 +1488,12 @@ export namespace Server {
             },
           },
         }),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          await Bus.publish(TuiEvent.CommandExecute, {
+            command: "prompt.clear",
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/execute-command",
@@ -1401,13 +1512,27 @@ export namespace Server {
             ...errors(400),
           },
         }),
-        validator(
-          "json",
-          z.object({
-            command: z.string(),
-          }),
-        ),
-        async (c) => c.json(await callTui(c)),
+        validator("json", z.object({ command: z.string() })),
+        async (c) => {
+          const command = c.req.valid("json").command
+          await Bus.publish(TuiEvent.CommandExecute, {
+            // @ts-expect-error
+            command: {
+              session_new: "session.new",
+              session_share: "session.share",
+              session_interrupt: "session.interrupt",
+              session_compact: "session.compact",
+              messages_page_up: "session.page.up",
+              messages_page_down: "session.page.down",
+              messages_half_page_up: "session.half.page.up",
+              messages_half_page_down: "session.half.page.down",
+              messages_first: "session.first",
+              messages_last: "session.last",
+              agent_cycle: "agent.cycle",
+            }[command],
+          })
+          return c.json(true)
+        },
       )
       .post(
         "/tui/show-toast",
@@ -1425,15 +1550,52 @@ export namespace Server {
             },
           },
         }),
+        validator("json", TuiEvent.ToastShow.properties),
+        async (c) => {
+          await Bus.publish(TuiEvent.ToastShow, c.req.valid("json"))
+          return c.json(true)
+        },
+      )
+      .post(
+        "/tui/publish",
+        describeRoute({
+          description: "Publish a TUI event",
+          operationId: "tui.publish",
+          responses: {
+            200: {
+              description: "Event published successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+            ...errors(400),
+          },
+        }),
         validator(
           "json",
-          z.object({
-            title: z.string().optional(),
-            message: z.string(),
-            variant: z.enum(["info", "success", "warning", "error"]),
-          }),
+          z.union(
+            Object.values(TuiEvent).map((def) => {
+              return z
+                .object({
+                  type: z.literal(def.type),
+                  properties: def.properties,
+                })
+                .meta({
+                  ref: "Event" + "." + def.type,
+                })
+            }),
+          ),
         ),
-        async (c) => c.json(await callTui(c)),
+        async (c) => {
+          const evt = c.req.valid("json")
+          await Bus.publish(
+            Object.values(TuiEvent).find((def) => def.type === evt.type)!,
+            evt.properties,
+          )
+          return c.json(true)
+        },
       )
       .route("/tui/control", TuiRoute)
       .put(

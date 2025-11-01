@@ -1,4 +1,4 @@
-import z from "zod/v4"
+import z from "zod"
 import * as path from "path"
 import { Tool } from "./tool"
 import { LSP } from "../lsp"
@@ -10,14 +10,12 @@ import { FileTime } from "../file/time"
 import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Agent } from "../agent/agent"
-import { createTwoFilesPatch } from "diff"
-import { trimDiff } from "./edit"
 
 export const WriteTool = Tool.define("write", {
   description: DESCRIPTION,
   parameters: z.object({
-    filePath: z.string().describe("The absolute path to the file to write (must be absolute, not relative)"),
     content: z.string().describe("The content to write to the file"),
+    filePath: z.string().describe("The absolute path to the file to write (must be absolute, not relative)"),
   }),
   async execute(params, ctx) {
     const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
@@ -28,13 +26,6 @@ export const WriteTool = Tool.define("write", {
     const file = Bun.file(filepath)
     const exists = await file.exists()
     if (exists) await FileTime.assert(ctx.sessionID, filepath)
-
-    let oldContent = ""
-    let diff = ""
-
-    if (exists) {
-      oldContent = await file.text()
-    }
 
     const agent = await Agent.get(ctx.agent)
     if (agent.permission.edit === "ask")
@@ -56,9 +47,6 @@ export const WriteTool = Tool.define("write", {
       file: filepath,
     })
     FileTime.read(ctx.sessionID, filepath)
-
-    // Generate diff for the write operation
-    diff = trimDiff(createTwoFilesPatch(filepath, filepath, oldContent, params.content))
 
     let output = ""
     await LSP.touchFile(filepath, true)

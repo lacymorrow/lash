@@ -4,7 +4,7 @@ import type { Diagnostic as VSCodeDiagnostic } from "vscode-languageserver-types
 import { Log } from "../util/log"
 import { LANGUAGE_EXTENSIONS } from "./language"
 import { Bus } from "../bus"
-import z from "zod/v4"
+import z from "zod"
 import type { LSPServer } from "./server"
 import { NamedError } from "../util/error"
 import { withTimeout } from "../util/timeout"
@@ -139,7 +139,10 @@ export namespace LSPClient {
           if (version !== undefined) {
             const next = version + 1
             files[input.path] = next
-            log.info("textDocument/didChange", { path: input.path, version: next })
+            log.info("textDocument/didChange", {
+              path: input.path,
+              version: next,
+            })
             await connection.sendNotification("textDocument/didChange", {
               textDocument: {
                 uri: `file://` + input.path,

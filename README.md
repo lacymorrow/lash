@@ -32,11 +32,11 @@ brew install lacymorrow/tap/lash
 
 ### Documentation
 
-For more info on how to configure OpenCode [**head over to our docs**](https://opencode.ai/docs).
+For more info on how to configure Lash [**head over to our docs**](https://opencode.ai/docs).
 
 ### Contributing
 
-OpenCode is an opinionated tool so any fundamental feature needs to go through a
+Lash is an opinionated tool so any fundamental feature needs to go through a
 design process with the core team.
 
 > [!IMPORTANT]
@@ -56,14 +56,15 @@ Take a look at the git history to see what kind of PRs we end up merging.
 > [!NOTE]
 > If you do not follow the above guidelines we might close your PR.
 
-To run OpenCode locally you need.
+To run Lash locally you need.
 
 - Bun 1.3 or higher
 - Golang 1.24.x
 
 And run.
 ```bash
-npm install -g lash-cli
+bun install
+bun dev
 ```
 
 ### From Source
@@ -74,7 +75,8 @@ bun install
 bun run dev
 ```
 
-**API Client**: After making changes to the TypeScript API endpoints in `packages/opencode/src/server/server.ts`, you will need the OpenCode team to generate a new stainless sdk for the clients.
+**API Client**: After making changes to the TypeScript API endpoints in `packages/opencode/src/server/server.ts`, you will need the Lash team to generate a new stainless sdk for the clients.
+
 
 ## Usage
 
@@ -85,18 +87,14 @@ lash --help
 ## Features
 
 - 100% open source
-- Not coupled to any provider. Although Anthropic is recommended, OpenCode can be used with OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider-agnostic is important.
+- Not coupled to any provider. Although Anthropic is recommended, Lash can be used with OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider-agnostic is important.
 - Out of the box LSP support
-- A focus on TUI. OpenCode is built by neovim users and the creators of [terminal.shop](https://terminal.shop); we are going to push the limits of what's possible in the terminal.
-- A client/server architecture. This for example can allow OpenCode to run on your computer, while you can drive it remotely from a mobile app. Meaning that the TUI frontend is just one of the possible clients.
+- A focus on TUI. Lash is built by neovim users and the creators of [terminal.shop](https://terminal.shop); we are going to push the limits of what's possible in the terminal.
+- A client/server architecture. This for example can allow Lash to run on your computer, while you can drive it remotely from a mobile app. Meaning that the TUI frontend is just one of the possible clients.
 
 ## License
 
 MIT
-
-## License
-
-The other confusingly named repo has no relation to this one. You can [read the story behind it here](https://x.com/thdxr/status/1933561254481666466).
 
 ---
 
