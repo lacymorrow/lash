@@ -1164,7 +1164,8 @@ ToolRegistry.register<typeof BashTool>({
   name: "bash",
   container: "block",
   render(props) {
-    const output = createMemo(() => Bun.stripANSI(props.metadata.output?.trim() ?? ""))
+    const stripANSI = (text: string) => text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    const output = createMemo(() => stripANSI(props.metadata.output?.trim() ?? ""))
     const { theme } = useTheme()
     return (
       <>

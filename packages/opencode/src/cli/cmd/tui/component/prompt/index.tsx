@@ -9,7 +9,7 @@ import {
   dim,
   fg,
 } from "@opentui/core"
-import { createEffect, createMemo, Match, Switch, type JSX, onMount, batch } from "solid-js"
+import { createEffect, createMemo, createSignal, Match, Switch, type JSX, onMount, batch } from "solid-js"
 import { useLocal } from "@tui/context/local"
 import { useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
@@ -29,6 +29,7 @@ import { Clipboard } from "../../util/clipboard"
 import type { FilePart } from "@opencode-ai/sdk"
 import { TuiEvent } from "../../event"
 import { iife } from "@/util/iife"
+import { getModeController, ExecutionMode } from "@/shell/mode"
 
 export type PromptProps = {
   sessionID?: string
@@ -91,6 +92,14 @@ export function Prompt(props: PromptProps) {
   const agentStyleId = syntax().getStyleId("extmark.agent")!
   const pasteStyleId = syntax().getStyleId("extmark.paste")!
   let promptPartTypeId: number
+
+  const modeController = getModeController()
+  const [executionMode, setExecutionMode] = createSignal<ExecutionMode>(modeController.getMode())
+
+  createEffect(() => {
+    const currentMode = modeController.getMode()
+    setExecutionMode(currentMode)
+  })
 
   command.register(() => {
     return [
@@ -171,6 +180,16 @@ export function Prompt(props: PromptProps) {
           dialog.clear()
         },
       },
+      {
+        title: "Toggle execution mode",
+        value: "mode.toggle",
+        category: "Session",
+        onSelect: (dialog) => {
+          const newMode = modeController.toggleMode()
+          setExecutionMode(newMode)
+          dialog.clear()
+        },
+      },
     ]
   })
 
@@ -185,14 +204,14 @@ export function Prompt(props: PromptProps) {
 
   const [store, setStore] = createStore<{
     prompt: PromptInfo
-    mode: "normal" | "shell"
+    tempShellMode: boolean
     extmarkToPartIndex: Map<number, number>
   }>({
     prompt: {
       input: "",
       parts: [],
     },
-    mode: "normal",
+    tempShellMode: false,
     extmarkToPartIndex: new Map(),
   })
 
@@ -353,7 +372,18 @@ export function Prompt(props: PromptProps) {
     // Filter out text parts (pasted content) since they're now expanded inline
     const nonTextParts = store.prompt.parts.filter((part) => part.type !== "text")
 
-    if (store.mode === "shell") {
+    const currentMode = store.tempShellMode ? ExecutionMode.Shell : executionMode()
+    let shouldRouteToShell = false
+
+    if (currentMode === ExecutionMode.Shell) {
+      shouldRouteToShell = true
+    } else if (currentMode === ExecutionMode.Auto) {
+      shouldRouteToShell = await modeController.shouldRouteToShell(inputText)
+    } else if (currentMode === ExecutionMode.Agent) {
+      shouldRouteToShell = false
+    }
+
+    if (shouldRouteToShell) {
       sdk.client.session.shell({
         path: {
           id: sessionID,
@@ -363,7 +393,7 @@ export function Prompt(props: PromptProps) {
           command: inputText,
         },
       })
-      setStore("mode", "normal")
+      setStore("tempShellMode", false)
     } else if (
       inputText.startsWith("/") &&
       iife(() => {
@@ -500,7 +530,11 @@ export function Prompt(props: PromptProps) {
           flexDirection="row"
           {...SplitBorder}
           borderColor={
-            keybind.leader ? theme.accent : store.mode === "shell" ? theme.secondary : theme.border
+            keybind.leader
+              ? theme.accent
+              : store.tempShellMode || executionMode() === ExecutionMode.Shell
+                ? theme.secondary
+                : theme.border
           }
           justifyContent="space-evenly"
         >
@@ -512,7 +546,13 @@ export function Prompt(props: PromptProps) {
             paddingTop={1}
           >
             <text attributes={TextAttributes.BOLD} fg={theme.primary}>
-              {store.mode === "normal" ? ">" : "!"}
+              {store.tempShellMode || executionMode() === ExecutionMode.Shell
+                ? "!"
+                : executionMode() === ExecutionMode.Agent
+                  ? "A"
+                  : executionMode() === ExecutionMode.Auto
+                    ? ">"
+                    : ">"}
             </text>
           </box>
           <box
@@ -568,22 +608,47 @@ export function Prompt(props: PromptProps) {
                   await exit()
                   return
                 }
-                if (e.name === "!" && input.visualCursor.offset === 0) {
-                  setStore("mode", "shell")
+                // Debug logging for Ctrl+Space detection
+                if (e.ctrl && !e.meta && !e.shift) {
+                  console.log("[Mode Toggle Debug] Key event:", {
+                    name: e.name,
+                    nameType: typeof e.name,
+                    nameLength: e.name?.length,
+                    nameCharCode: e.name ? e.name.charCodeAt(0) : null,
+                    ctrl: e.ctrl,
+                    meta: e.meta,
+                    shift: e.shift,
+                    fullEvent: e,
+                  })
+                }
+                // Ctrl+Space to toggle execution mode
+                // Note: Some terminals may represent Ctrl+Space differently
+                // If Ctrl+Space doesn't work, use the command dialog (Ctrl+P) and search for "Toggle execution mode"
+                if (e.ctrl && !e.meta && !e.shift && (e.name === " " || e.name === "space")) {
+                  console.log("[Mode Toggle] Toggling mode via Ctrl+Space")
+                  const newMode = modeController.toggleMode()
+                  setExecutionMode(newMode)
                   e.preventDefault()
                   return
                 }
-                if (store.mode === "shell") {
+                if (e.name === "!" && input.visualCursor.offset === 0) {
+                  setStore("tempShellMode", true)
+                  e.preventDefault()
+                  return
+                }
+                if (store.tempShellMode) {
                   if (
                     (e.name === "backspace" && input.visualCursor.offset === 0) ||
                     e.name === "escape"
                   ) {
-                    setStore("mode", "normal")
+                    setStore("tempShellMode", false)
                     e.preventDefault()
                     return
                   }
                 }
-                if (store.mode === "normal") autocomplete.onKeyDown(e)
+                if (!store.tempShellMode && executionMode() !== ExecutionMode.Shell) {
+                  autocomplete.onKeyDown(e)
+                }
                 if (!autocomplete.visible) {
                   if (
                     (keybind.match("history_previous", e) && input.cursorOffset === 0) ||
@@ -705,10 +770,15 @@ export function Prompt(props: PromptProps) {
           ></box>
         </box>
         <box flexDirection="row" justifyContent="space-between">
-          <text flexShrink={0} wrapMode="none" fg={theme.text}>
-            <span style={{ fg: theme.textMuted }}>{local.model.parsed().provider}</span>{" "}
-            <span style={{ bold: true }}>{local.model.parsed().model}</span>
-          </text>
+          <box flexDirection="row" gap={2}>
+            <text flexShrink={0} wrapMode="none" fg={theme.text}>
+              <span style={{ fg: theme.textMuted }}>{local.model.parsed().provider}</span>{" "}
+              <span style={{ bold: true }}>{local.model.parsed().model}</span>
+            </text>
+            <text flexShrink={0} wrapMode="none" fg={theme.textMuted}>
+              <span style={{ fg: theme.secondary }}>{executionMode()}</span>
+            </text>
+          </box>
           <Switch>
             <Match when={status() === "compacting"}>
               <text fg={theme.textMuted}>compacting...</text>
