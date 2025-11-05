@@ -52,7 +52,7 @@ export function Autocomplete(props: {
     // Track props.value to make memo reactive to text changes
     props.value // <- there surely is a better way to do this, like making .input() reactive
 
-    const val = props.input().getTextRange(store.index + 1, props.input().cursorOffset + 1)
+    const val = props.input().plainText.slice(store.index + 1, props.input().cursorOffset + 1)
 
     // If the filter contains a space, hide the autocomplete
     if (val.includes(" ")) {
@@ -396,7 +396,7 @@ export function Autocomplete(props: {
           // Check if a space was typed after the trigger character
           const currentText = props
             .input()
-            .getTextRange(store.index + 1, props.input().cursorOffset + 1)
+            .plainText.slice(store.index + 1, props.input().cursorOffset + 1)
           if (currentText.includes(" ")) {
             hide()
           }
@@ -436,7 +436,7 @@ export function Autocomplete(props: {
             const charBeforeCursor =
               cursorOffset === 0
                 ? undefined
-                : props.input().getTextRange(cursorOffset - 1, cursorOffset)
+                : props.input().plainText.slice(cursorOffset - 1, cursorOffset)
             const canTrigger =
               charBeforeCursor === undefined ||
               charBeforeCursor === "" ||

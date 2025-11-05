@@ -346,10 +346,6 @@ export namespace ACP {
             id: "opencode-login",
           },
         ],
-        agentInfo: {
-          name: "OpenCode",
-          version: Installation.VERSION,
-        },
       }
     }
 
