@@ -77,7 +77,15 @@ export namespace MCP {
       }
     },
     async (state) => {
-      await Promise.all(Object.values(state.clients).map((client) => client.close()))
+      await Promise.all(
+        Object.values(state.clients).map((client) =>
+          client.close().catch((error) => {
+            log.error("Failed to close MCP client", {
+              error,
+            })
+          }),
+        ),
+      )
     },
   )
 
@@ -100,7 +108,7 @@ export namespace MCP {
     }
     log.info("found", { key, type: mcp.type })
     let mcpClient: MCPClient | undefined
-    let status: Status | undefined
+    let status: Status | undefined = undefined
 
     if (mcp.type === "remote") {
       const transports = [
@@ -142,7 +150,7 @@ export namespace MCP {
               error: lastError.message,
             })
             status = {
-              status: "failed",
+              status: "failed" as const,
               error: lastError.message,
             }
             return false
@@ -179,7 +187,7 @@ export namespace MCP {
             error: error instanceof Error ? error.message : String(error),
           })
           status = {
-            status: "failed",
+            status: "failed" as const,
             error: error instanceof Error ? error.message : String(error),
           }
         })
@@ -187,7 +195,7 @@ export namespace MCP {
 
     if (!status) {
       status = {
-        status: "failed",
+        status: "failed" as const,
         error: "Unknown error",
       }
     }
@@ -201,14 +209,21 @@ export namespace MCP {
 
     const result = await withTimeout(mcpClient.tools(), mcp.timeout ?? 5000).catch(() => {})
     if (!result) {
-      await mcpClient.close()
+      await mcpClient.close().catch((error) => {
+        log.error("Failed to close MCP client", {
+          error,
+        })
+      })
       status = {
         status: "failed",
         error: "Failed to get tools",
       }
       return {
         mcpClient: undefined,
-        status,
+        status: {
+          status: "failed" as const,
+          error: "Failed to get tools",
+        },
       }
     }
 
@@ -228,10 +243,23 @@ export namespace MCP {
 
   export async function tools() {
     const result: Record<string, Tool> = {}
+    const s = await state()
     for (const [clientName, client] of Object.entries(await clients())) {
-      for (const [toolName, tool] of Object.entries(await client.tools())) {
-        const sanitizedClientName = clientName.replace(/\s+/g, "_")
-        const sanitizedToolName = toolName.replace(/[-\s]+/g, "_")
+      const tools = await client.tools().catch((e) => {
+        log.error("failed to get tools", { clientName, error: e.message })
+        const failedStatus = {
+          status: "failed" as const,
+          error: e instanceof Error ? e.message : String(e),
+        }
+        s.status[clientName] = failedStatus
+        delete s.clients[clientName]
+      })
+      if (!tools) {
+        continue
+      }
+      for (const [toolName, tool] of Object.entries(tools)) {
+        const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
+        const sanitizedToolName = toolName.replace(/[^a-zA-Z0-9_-]/g, "_")
         result[sanitizedClientName + "_" + sanitizedToolName] = tool
       }
     }
