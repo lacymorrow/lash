@@ -624,7 +624,12 @@ export function Prompt(props: PromptProps) {
                 // Ctrl+Space to toggle execution mode
                 // Note: Some terminals may represent Ctrl+Space differently
                 // If Ctrl+Space doesn't work, use the command dialog (Ctrl+P) and search for "Toggle execution mode"
-                if (e.ctrl && !e.meta && !e.shift && (e.name === " " || e.name === "space")) {
+                if (
+                  e.ctrl &&
+                  !e.meta &&
+                  !e.shift &&
+                  (e.name === " " || e.name === "space" || e.sequence === "\x00")
+                ) {
                   console.log("[Mode Toggle] Toggling mode via Ctrl+Space")
                   const newMode = modeController.toggleMode()
                   setExecutionMode(newMode)
