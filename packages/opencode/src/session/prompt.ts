@@ -1400,7 +1400,6 @@ export namespace SessionPrompt {
       },
       role: "user",
     }
-    await Session.updateMessage(userMsg)
     const userPart: MessageV2.Part = {
       type: "text",
       id: Identifier.ascending("part"),
@@ -1409,7 +1408,6 @@ export namespace SessionPrompt {
       text: "The following tool was executed by the user",
       synthetic: true,
     }
-    await Session.updatePart(userPart)
 
     const msg: MessageV2.Assistant = {
       id: Identifier.ascending("message"),
@@ -1435,7 +1433,6 @@ export namespace SessionPrompt {
       modelID: "",
       providerID: "",
     }
-    await Session.updateMessage(msg)
     const part: MessageV2.Part = {
       type: "tool",
       id: Identifier.ascending("part"),
@@ -1453,7 +1450,13 @@ export namespace SessionPrompt {
         },
       },
     }
-    await Session.updatePart(part)
+    
+    await Promise.all([
+      Session.updateMessage(userMsg),
+      Session.updatePart(userPart),
+      Session.updateMessage(msg),
+      Session.updatePart(part),
+    ])
     const shell = process.env["SHELL"] ?? "bash"
     const shellName = path.basename(shell)
 
