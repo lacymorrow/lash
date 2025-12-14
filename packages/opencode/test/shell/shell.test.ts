@@ -1,104 +1,181 @@
 import { describe, it, expect, beforeEach } from "bun:test"
+import path from "path"
 import { PersistentShell } from "../../src/shell/persistent"
 import { ModeController, ExecutionMode } from "../../src/shell/mode"
 import { Shell } from "../../src/shell/shell"
+import { execute as SessionShellExecute, dispose as SessionShellDispose } from "../../src/shell/session-shell"
+import { Instance } from "../../src/project/instance"
+
+const projectRoot = path.join(__dirname, "../..")
 
 describe("PersistentShell", () => {
   let shell: PersistentShell
 
-  beforeEach(() => {
-    shell = new PersistentShell()
-  })
-
   describe("execute", () => {
     it("should execute simple commands", async () => {
-      const result = await shell.execute("echo hello")
-      expect(result.success).toBe(true)
-      expect(result.stdout.trim()).toBe("hello")
-      expect(result.exitCode).toBe(0)
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("echo hello")
+          expect(result.success).toBe(true)
+          expect(result.stdout.trim()).toBe("hello")
+          expect(result.exitCode).toBe(0)
+        },
+      })
     })
 
     it("should handle command failures", async () => {
-      const result = await shell.execute("nonexistentcommand123")
-      expect(result.success).toBe(false)
-      expect(result.exitCode).not.toBe(0)
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("nonexistentcommand123")
+          expect(result.success).toBe(false)
+          expect(result.exitCode).not.toBe(0)
+        },
+      })
     })
 
     it("should execute with timeout", async () => {
-      const result = await shell.execute("echo quick", { timeout: 5000 })
-      expect(result.success).toBe(true)
-      expect(result.stdout.trim()).toBe("quick")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("echo quick", { timeout: 5000 })
+          expect(result.success).toBe(true)
+          expect(result.stdout.trim()).toBe("quick")
+        },
+      })
     })
   })
 
   describe("cd command", () => {
     it("should change working directory", async () => {
-      const tempDir = "/tmp"
-      const result = await shell.execute(`cd ${tempDir}`)
-      expect(result.success).toBe(true)
-      expect(shell.getWorkingDir()).toBe(tempDir)
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const tempDir = "/tmp"
+          const result = await shell.execute(`cd ${tempDir}`)
+          expect(result.success).toBe(true)
+          expect(shell.getWorkingDir()).toBe(tempDir)
+        },
+      })
     })
 
     it("should handle cd to home directory", async () => {
-      const result = await shell.execute("cd")
-      expect(result.success).toBe(true)
-      expect(shell.getWorkingDir()).toBe(process.env['HOME'] || "/")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("cd")
+          expect(result.success).toBe(true)
+          expect(shell.getWorkingDir()).toBe(process.env["HOME"] || "/")
+        },
+      })
     })
 
     it("should handle cd with ~ expansion", async () => {
-      const result = await shell.execute("cd ~/")
-      expect(result.success).toBe(true)
-      expect(shell.getWorkingDir()).toBe(process.env['HOME'] || "/")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("cd ~/")
+          expect(result.success).toBe(true)
+          expect(shell.getWorkingDir()).toBe(process.env["HOME"] || "/")
+        },
+      })
     })
 
     it("should handle cd to non-existent directory", async () => {
-      const result = await shell.execute("cd /nonexistent/directory/path")
-      expect(result.success).toBe(false)
-      expect(result.stderr).toContain("no such file or directory")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute("cd /nonexistent/directory/path")
+          expect(result.success).toBe(false)
+          expect(result.stderr).toContain("no such file or directory")
+        },
+      })
     })
 
     it("should handle quoted paths", async () => {
-      const result = await shell.execute('cd "/tmp"')
-      expect(result.success).toBe(true)
-      expect(shell.getWorkingDir()).toBe("/tmp")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          const result = await shell.execute('cd "/tmp"')
+          expect(result.success).toBe(true)
+          expect(shell.getWorkingDir()).toBe("/tmp")
+        },
+      })
     })
   })
 
   describe("export command", () => {
-    it("should set environment variables", () => {
-      const result = shell["handleExportCommand"]("export TEST_VAR=hello")
-      expect(result.success).toBe(true)
-      expect(shell.getEnv("TEST_VAR")).toBe("hello")
+    it("should set environment variables", async () => {
+      await Instance.provide({
+        directory: projectRoot,
+        fn: () => {
+          shell = new PersistentShell()
+          const result = shell["handleExportCommand"]("export TEST_VAR=hello")
+          expect(result.success).toBe(true)
+          expect(shell.getEnv("TEST_VAR")).toBe("hello")
+        },
+      })
     })
 
-    it("should handle quoted values", () => {
-      const result = shell["handleExportCommand"]('export TEST_VAR="hello world"')
-      expect(result.success).toBe(true)
-      expect(shell.getEnv("TEST_VAR")).toBe("hello world")
+    it("should handle quoted values", async () => {
+      await Instance.provide({
+        directory: projectRoot,
+        fn: () => {
+          shell = new PersistentShell()
+          const result = shell["handleExportCommand"]('export TEST_VAR="hello world"')
+          expect(result.success).toBe(true)
+          expect(shell.getEnv("TEST_VAR")).toBe("hello world")
+        },
+      })
     })
 
-    it("should handle invalid export syntax", () => {
-      const result = shell["handleExportCommand"]("export invalid syntax")
-      expect(result.success).toBe(false)
-      expect(result.stderr).toContain("invalid syntax")
+    it("should handle invalid export syntax", async () => {
+      await Instance.provide({
+        directory: projectRoot,
+        fn: () => {
+          shell = new PersistentShell()
+          const result = shell["handleExportCommand"]("export invalid syntax")
+          expect(result.success).toBe(false)
+          expect(result.stderr).toContain("invalid syntax")
+        },
+      })
     })
   })
 
   describe("state management", () => {
     it("should reset state", async () => {
-      await shell.execute("cd /tmp")
-      shell.setEnv("TEST_VAR", "value")
-      
-      shell.reset()
-      
-      expect(shell.getWorkingDir()).not.toBe("/tmp")
-      expect(shell.getEnv("TEST_VAR")).toBeUndefined()
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          await shell.execute("cd /tmp")
+          shell.setEnv("TEST_VAR", "value")
+          shell.reset()
+          expect(shell.getWorkingDir()).not.toBe("/tmp")
+          expect(shell.getEnv("TEST_VAR")).toBeUndefined()
+        },
+      })
     })
 
     it("should maintain environment across commands", async () => {
-      shell.setEnv("MY_VAR", "test")
-      const result = await shell.execute("echo $MY_VAR")
-      expect(result.stdout.trim()).toBe("test")
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          shell = new PersistentShell()
+          shell.setEnv("MY_VAR", "test")
+          const result = await shell.execute("echo $MY_VAR")
+          expect(result.stdout.trim()).toBe("test")
+        },
+      })
     })
   })
 })
@@ -152,9 +229,9 @@ describe("ModeController", () => {
     })
 
     it("should route natural language to agent", async () => {
-      expect(await controller.shouldRouteToShell("what is the weather today")).toBe(false)
-      expect(await controller.shouldRouteToShell("help me write a function")).toBe(false)
-      expect(await controller.shouldRouteToShell("explain this code")).toBe(false)
+      expect(await controller.shouldRouteToShell("why is my code failing today")).toBe(false)
+      expect(await controller.shouldRouteToShell("please help me write a function")).toBe(false)
+      expect(await controller.shouldRouteToShell("can you explain this code")).toBe(false)
     })
 
     it("should respect forced modes", async () => {
@@ -213,34 +290,161 @@ describe("ModeController", () => {
 
 describe("Shell integration", () => {
   it("should provide singleton instances", () => {
-    const shell1 = Shell.get()
-    const shell2 = Shell.get()
-    expect(shell1).toBe(shell2)
+    Instance.provide({
+      directory: projectRoot,
+      fn: () => {
+        const shell1 = Shell.get()
+        const shell2 = Shell.get()
+        expect(shell1).toBe(shell2)
 
-    const controller1 = Shell.getModeController()
-    const controller2 = Shell.getModeController()
-    expect(controller1).toBe(controller2)
+        const controller1 = Shell.getModeController()
+        const controller2 = Shell.getModeController()
+        expect(controller1).toBe(controller2)
+      },
+    })
   })
 
   it("should manage working directory", () => {
-    const originalCwd = Shell.getCwd()
-    Shell.setCwd("/tmp")
-    expect(Shell.getCwd()).toBe("/tmp")
-    Shell.setCwd(originalCwd)
+    Instance.provide({
+      directory: projectRoot,
+      fn: () => {
+        const originalCwd = Shell.getCwd()
+        Shell.setCwd("/tmp")
+        expect(Shell.getCwd()).toBe("/tmp")
+        Shell.setCwd(originalCwd)
+      },
+    })
   })
 
   it("should manage execution mode", () => {
-    Shell.setMode(ExecutionMode.Shell)
-    expect(Shell.getMode()).toBe(ExecutionMode.Shell)
-    
-    const newMode = Shell.toggleMode()
-    expect(newMode).toBe(ExecutionMode.Agent)
-    expect(Shell.getMode()).toBe(ExecutionMode.Agent)
+    Instance.provide({
+      directory: projectRoot,
+      fn: () => {
+        Shell.setMode(ExecutionMode.Shell)
+        expect(Shell.getMode()).toBe(ExecutionMode.Shell)
+
+        const newMode = Shell.toggleMode()
+        expect(newMode).toBe(ExecutionMode.Agent)
+        expect(Shell.getMode()).toBe(ExecutionMode.Agent)
+      },
+    })
   })
 
   it("should reset shell state", () => {
-    Shell.setCwd("/tmp")
-    Shell.reset()
-    expect(Shell.getCwd()).not.toBe("/tmp")
+    Instance.provide({
+      directory: projectRoot,
+      fn: () => {
+        Shell.setCwd("/tmp")
+        Shell.reset()
+        expect(Shell.getCwd()).not.toBe("/tmp")
+      },
+    })
+  })
+})
+
+describe("Session shell persistence", () => {
+  it("should persist environment variables across commands", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const sessionID = "test-session-env"
+        SessionShellDispose(sessionID)
+
+        await SessionShellExecute({
+          sessionID,
+          command: "export OPENCODE_TEST_VAR=123",
+          signal: AbortSignal.any([]),
+        })
+        const result = await SessionShellExecute({
+          sessionID,
+          command: "echo $OPENCODE_TEST_VAR",
+          signal: AbortSignal.any([]),
+        })
+        expect(result.output.trim()).toBe("123")
+      },
+    })
+  })
+
+  it("should persist working directory across commands", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const sessionID = "test-session-cwd"
+        SessionShellDispose(sessionID)
+
+        await SessionShellExecute({
+          sessionID,
+          command: "cd /tmp",
+          signal: AbortSignal.any([]),
+        })
+        const result = await SessionShellExecute({
+          sessionID,
+          command: "pwd",
+          signal: AbortSignal.any([]),
+        })
+        expect(result.output.trim()).toBe("/tmp")
+      },
+    })
+  })
+
+  it("should persist aliases and functions across commands", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const sessionID = "test-session-alias-fn"
+        SessionShellDispose(sessionID)
+
+        await SessionShellExecute({
+          sessionID,
+          command: "alias opencode_ll='echo alias_ok'",
+          signal: AbortSignal.any([]),
+        })
+        const aliasResult = await SessionShellExecute({
+          sessionID,
+          command: "opencode_ll",
+          signal: AbortSignal.any([]),
+        })
+        expect(aliasResult.output.trim()).toBe("alias_ok")
+
+        await SessionShellExecute({
+          sessionID,
+          command: "opencode_fn(){ echo fn_ok; }",
+          signal: AbortSignal.any([]),
+        })
+        const fnResult = await SessionShellExecute({
+          sessionID,
+          command: "opencode_fn",
+          signal: AbortSignal.any([]),
+        })
+        expect(fnResult.output.trim()).toBe("fn_ok")
+      },
+    })
+  })
+
+  it("should reset session shell after abort", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const sessionID = "test-session-abort"
+        SessionShellDispose(sessionID)
+
+        const controller = new AbortController()
+        const running = SessionShellExecute({
+          sessionID,
+          command: "sleep 10",
+          signal: controller.signal,
+        })
+
+        setTimeout(() => controller.abort(), 100)
+        await expect(running).rejects.toThrow("Command aborted")
+
+        const next = await SessionShellExecute({
+          sessionID,
+          command: "echo after_abort",
+          signal: AbortSignal.any([]),
+        })
+        expect(next.output.trim()).toBe("after_abort")
+      },
+    })
   })
 })

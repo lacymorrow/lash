@@ -45,13 +45,13 @@ import { FileTime } from "../file/time"
 import { Permission } from "../permission"
 import { Snapshot } from "../snapshot"
 import { ulid } from "ulid"
-import { spawn } from "child_process"
 import { Command } from "../command"
 import { $, fileURLToPath } from "bun"
 import { ConfigMarkdown } from "../config/markdown"
 import { SessionSummary } from "./summary"
 import { Config } from "@/config/config"
 import { NamedError } from "@/util/error"
+import { execute as SessionShellExecute } from "../shell/session-shell"
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -1457,91 +1457,37 @@ export namespace SessionPrompt {
       Session.updateMessage(msg),
       Session.updatePart(part),
     ])
-    const shell = process.env["SHELL"] ?? "bash"
-    const shellName = path.basename(shell)
+    let output = ""
+    const exec = await SessionShellExecute({
+      sessionID: input.sessionID,
+      command: input.command,
+      signal: abort.signal,
+      onData: (chunk) => {
+        output += chunk
+        if (part.state.status !== "running") return
+        part.state.metadata = {
+          output: output,
+          description: "",
+        }
+        Session.updatePart(part)
+      },
+    })
+      .then((result) => ({ ok: true as const, result }))
+      .catch((error) => ({
+        ok: false as const,
+        error: error instanceof Error ? error : new Error(String(error)),
+      }))
 
-    const invocations: Record<string, { args: string[] }> = {
-      nu: {
-        args: ["-c", input.command],
-      },
-      fish: {
-        args: ["-c", input.command],
-      },
-      zsh: {
-        args: [
-          "-c",
-          "-l",
-          `
-            [[ -f ~/.zshenv ]] && source ~/.zshenv >/dev/null 2>&1 || true
-            [[ -f "\${ZDOTDIR:-$HOME}/.zshrc" ]] && source "\${ZDOTDIR:-$HOME}/.zshrc" >/dev/null 2>&1 || true
-            ${input.command}
-          `,
-        ],
-      },
-      bash: {
-        args: [
-          "-c",
-          "-l",
-          `
-            [[ -f ~/.bashrc ]] && source ~/.bashrc >/dev/null 2>&1 || true
-            ${input.command}
-          `,
-        ],
-      },
-      // Fallback: any shell that doesn't match those above
-      "": {
-        args: ["-c", "-l", `${input.command}`],
-      },
+    if (exec.ok) {
+      output = exec.result.output
+    }
+    if (!exec.ok) {
+      if (output.trim()) {
+        output += "\n\n"
+      }
+      output += exec.error.message
     }
 
-    const matchingInvocation = invocations[shellName] ?? invocations[""]
-    const args = matchingInvocation?.args
-
-    const proc = spawn(shell, args, {
-      cwd: Instance.directory,
-      signal: abort.signal,
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        TERM: "dumb",
-      },
-    })
-
-    abort.signal.addEventListener("abort", () => {
-      if (!proc.pid) return
-      process.kill(-proc.pid)
-    })
-
-    let output = ""
-
-    proc.stdout?.on("data", (chunk) => {
-      output += chunk.toString()
-      if (part.state.status === "running") {
-        part.state.metadata = {
-          output: output,
-          description: "",
-        }
-        Session.updatePart(part)
-      }
-    })
-
-    proc.stderr?.on("data", (chunk) => {
-      output += chunk.toString()
-      if (part.state.status === "running") {
-        part.state.metadata = {
-          output: output,
-          description: "",
-        }
-        Session.updatePart(part)
-      }
-    })
-
-    await new Promise<void>((resolve) => {
-      proc.on("close", () => {
-        resolve()
-      })
-    })
     msg.time.completed = Date.now()
     await Session.updateMessage(msg)
     if (part.state.status === "running") {

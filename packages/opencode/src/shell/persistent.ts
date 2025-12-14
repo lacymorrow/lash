@@ -48,14 +48,16 @@ export class PersistentShell {
     timeout?: number
     signal?: AbortSignal
   }): Promise<ShellResult> {
+    const trimmed = command.trim()
+
     // Handle cd commands specially to update working directory
-    if (command.trim().startsWith("cd ")) {
-      return this.handleCdCommand(command)
+    if (trimmed === "cd" || trimmed.startsWith("cd ")) {
+      return this.handleCdCommand(trimmed)
     }
     
     // Handle export commands to update environment
-    if (command.trim().startsWith("export ")) {
-      return this.handleExportCommand(command)
+    if (trimmed.startsWith("export ")) {
+      return this.handleExportCommand(trimmed)
     }
     
     // Execute command with current state
