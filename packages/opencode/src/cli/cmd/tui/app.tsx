@@ -28,6 +28,7 @@ import type { SessionRoute } from "./context/route"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
+import { Shell } from "@/shell/shell"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -178,6 +179,20 @@ function App() {
   const [sessionExists, setSessionExists] = createSignal(false)
   const { theme, mode, setMode } = useTheme()
   const exit = useExit()
+  const [workingDir, setWorkingDir] = createSignal(Shell.getCwd())
+
+  createEffect(() => {
+    if (route.data.type !== "session") {
+      setWorkingDir(Shell.getCwd())
+      return
+    }
+
+    const data = route.data as SessionRoute
+    const messages = sync.data.message[data.sessionID] ?? []
+    const lastAssistant = messages.findLast((m) => m.role === "assistant")
+    if (!lastAssistant) return
+    setWorkingDir(lastAssistant.path.cwd)
+  })
 
   useKeyboard(async (evt) => {
     if (!Installation.isLocal()) return
@@ -388,6 +403,15 @@ function App() {
     })
   })
 
+  // Poll working directory periodically to keep it in sync with shell commands
+  createEffect(() => {
+    if (route.data.type === "session") return
+    const interval = setInterval(() => {
+      setWorkingDir(Shell.getCwd())
+    }, 500)
+    return () => clearInterval(interval)
+  })
+
   return (
     <box
       width={dimensions().width}
@@ -439,7 +463,7 @@ function App() {
             <text fg={theme.textMuted}>v{Installation.VERSION}</text>
           </box>
           <box paddingLeft={1} paddingRight={1}>
-            <text fg={theme.textMuted}>{process.cwd().replace(Global.Path.home, "~")}</text>
+            <text fg={theme.textMuted}>{workingDir().replace(Global.Path.home, "~")}</text>
           </box>
         </box>
         <box flexDirection="row" flexShrink={0}>

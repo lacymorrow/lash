@@ -17,6 +17,7 @@ type ExecOptions = {
 export type ExecResult = {
   output: string
   exitCode: number
+  cwd?: string
 }
  
 type Running = {
@@ -91,9 +92,9 @@ class ShellProcess {
     const sentinel = `__OPENCODE_DONE__${id}__:`
  
     const abortHandler = () => {
-      this.closed = true
       const active = this.running
-      if (!active) return
+      if (!active || active.id !== id) return
+      this.closed = true
       this.running = undefined
       active.reject(new Error("Command aborted"))
       killProcessTree(this.proc)
@@ -149,6 +150,16 @@ class ShellProcess {
       if (ok) return
       this.proc.stdin.once("drain", () => {
         if (!this.running || this.running.id !== id) return
+        // Try writing again after drain event
+        try {
+          const writeOk = this.proc.stdin.write(payload)
+          if (!writeOk) {
+            // If write still fails after drain, reject the command
+            fail(new Error("Failed to write command to shell after drain"))
+          }
+        } catch (error) {
+          fail(error instanceof Error ? error : new Error("Failed to write command to shell"))
+        }
       })
     })
   }
@@ -184,12 +195,16 @@ class ShellProcess {
     const newline = after.indexOf("\n")
     if (newline === -1) return
  
-    const exitCodeText = after.slice(0, newline).trim()
+    const meta = after.slice(0, newline).trim()
+    const tab = meta.indexOf("\t")
+    const exitCodeText = (tab === -1 ? meta : meta.slice(0, tab)).trim()
+    const cwd = tab === -1 ? undefined : meta.slice(tab + 1).trim()
     const exitCode = Number(exitCodeText)
     const output = running.output.slice(0, index)
     running.resolve({
       output,
       exitCode: Number.isFinite(exitCode) ? exitCode : 1,
+      cwd: cwd || undefined,
     })
   }
 }
@@ -243,13 +258,15 @@ function wrapCommand(shellName: string, command: string, sentinel: string) {
 ${command}
 }
 __opencode_status__=$?
-printf '\\n${end}%s\\n' "$__opencode_status__"
+__opencode_cwd__="$(pwd -P 2>/dev/null || pwd)"
+printf '\\n${end}%s\\t%s\\n' "$__opencode_status__" "$__opencode_cwd__"
 `
   }
   return `
 ${command}
 __opencode_status__=$?
-printf '\\n${end}%s\\n' "$__opencode_status__"
+__opencode_cwd__="$(pwd -P 2>/dev/null || pwd)"
+printf '\\n${end}%s\\t%s\\n' "$__opencode_status__" "$__opencode_cwd__"
 `
 }
  
@@ -292,11 +309,11 @@ function killProcessTree(proc: ChildProcessWithoutNullStreams) {
  
 const state = Instance.state(
   () => {
-  const shells = new Map<string, ShellProcess>()
-  const timers = new Map<string, Timer>()
-  const lastUsed = new Map<string, number>()
-  const ready: { init: boolean; unsub?: () => void } = { init: false }
-  return { shells, timers, lastUsed, ready }
+    const shells = new Map<string, ShellProcess>()
+    const timers = new Map<string, Timer>()
+    const lastUsed = new Map<string, number>()
+    const ready: { init: boolean; unsub?: () => void } = { init: false }
+    return { shells, timers, lastUsed, ready }
   },
   async (current) => {
     for (const shell of current.shells.values()) {
@@ -363,6 +380,15 @@ function scheduleDispose(sessionID: string) {
   if (existing) return
  
   const timer = setTimeout(() => {
+    // Check if shell still exists before attempting disposal
+    const shells = state().shells
+    if (!shells.has(sessionID)) {
+      // Already disposed, just clean up timer reference
+      state().timers.delete(sessionID)
+      state().lastUsed.delete(sessionID)
+      return
+    }
+    
     const last = state().lastUsed.get(sessionID) ?? 0
     const idleForMs = Date.now() - last
     if (idleForMs < 2 * 60 * 1000) {

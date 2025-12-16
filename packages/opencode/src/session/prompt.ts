@@ -52,6 +52,7 @@ import { SessionSummary } from "./summary"
 import { Config } from "@/config/config"
 import { NamedError } from "@/util/error"
 import { execute as SessionShellExecute } from "../shell/session-shell"
+import { Shell } from "../shell/shell"
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -1417,7 +1418,7 @@ export namespace SessionPrompt {
       mode: input.agent,
       cost: 0,
       path: {
-        cwd: Instance.directory,
+        cwd: Shell.getCwd(),
         root: Instance.worktree,
       },
       time: {
@@ -1479,7 +1480,15 @@ export namespace SessionPrompt {
       }))
 
     if (exec.ok) {
-      output = exec.result.output
+      if (exec.result.cwd) {
+        Shell.setCwd(exec.result.cwd)
+      }
+
+      if (!output) {
+        output = exec.result.output
+      }
+
+      msg.path.cwd = Shell.getCwd()
     }
     if (!exec.ok) {
       if (output.trim()) {
