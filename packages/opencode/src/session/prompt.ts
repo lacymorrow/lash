@@ -965,7 +965,7 @@ export namespace SessionPrompt {
         system: input.system,
         mode: input.agent,
         path: {
-          cwd: Instance.directory,
+          cwd: Shell.getCwd(),
           root: Instance.worktree,
         },
         cost: 0,
@@ -1674,7 +1674,7 @@ export namespace SessionPrompt {
         mode: agentName,
         cost: 0,
         path: {
-          cwd: Instance.directory,
+          cwd: Shell.getCwd(),
           root: Instance.worktree,
         },
         time: {

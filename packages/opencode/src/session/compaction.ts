@@ -17,6 +17,7 @@ import { SessionLock } from "./lock"
 import { ProviderTransform } from "@/provider/transform"
 import { SessionRetry } from "./retry"
 import { Config } from "@/config/config"
+import { Shell } from "@/shell/shell"
 
 export namespace SessionCompaction {
   const log = Log.create({ service: "session.compaction" })
@@ -116,7 +117,7 @@ export namespace SessionCompaction {
       system,
       mode: "build",
       path: {
-        cwd: Instance.directory,
+        cwd: Shell.getCwd(),
         root: Instance.worktree,
       },
       summary: true,
