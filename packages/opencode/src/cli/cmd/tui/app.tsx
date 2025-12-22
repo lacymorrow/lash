@@ -198,7 +198,6 @@ function App() {
     }
     if (latest) {
       if (workingDir() !== latest.path.cwd) {
-        // console.log("Updating workingDir from message", latest.path.cwd)
         setWorkingDir(latest.path.cwd)
       }
       return
@@ -207,7 +206,6 @@ function App() {
     const session = sync.session.get(data.sessionID)
     if (session) {
       if (workingDir() !== session.directory) {
-        // console.log("Updating workingDir from session", session.directory)
         setWorkingDir(session.directory)
       }
     }
@@ -243,7 +241,7 @@ function App() {
   })
 
   createEffect(() => {
-    console.log(JSON.stringify(route.data))
+    // console.log(JSON.stringify(route.data))
   })
 
   command.register(() => [
