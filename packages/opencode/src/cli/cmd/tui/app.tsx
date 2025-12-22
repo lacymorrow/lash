@@ -196,7 +196,7 @@ function App() {
         latest = message
       }
     }
-    if (latest) {
+    if (latest && latest.role === "assistant") {
       if (workingDir() !== latest.path.cwd) {
         setWorkingDir(latest.path.cwd)
       }
