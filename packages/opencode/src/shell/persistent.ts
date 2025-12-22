@@ -133,8 +133,9 @@ export class PersistentShell {
         }
       }
       
+      const previousDir = this.workingDir
       this.workingDir = resolvedPath
-      log.debug("changed directory", { from: this.workingDir, to: resolvedPath })
+      log.debug("changed directory", { from: previousDir, to: resolvedPath })
       
       return {
         stdout: "",

@@ -137,7 +137,19 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           }
           const result = Binary.search(messages, event.properties.info.id, (m) => m.id)
           if (result.found) {
-            setStore("message", event.properties.info.sessionID, result.index, reconcile(event.properties.info))
+            const incoming = event.properties.info
+            setStore("message", incoming.sessionID, result.index, (previous) => {
+              if (!previous) return incoming
+              if (previous.role !== "assistant") return reconcile(incoming)(previous)
+              if (incoming.role !== "assistant") return reconcile(incoming)(previous)
+
+              const previousCompleted = previous.time.completed
+              const incomingCompleted = incoming.time.completed
+              if (previousCompleted && !incomingCompleted) return previous
+              if (previousCompleted && incomingCompleted && incomingCompleted < previousCompleted) return previous
+
+              return reconcile(incoming)(previous)
+            })
             break
           }
           setStore(
@@ -257,10 +269,37 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           setStore(
             produce((draft) => {
               const match = Binary.search(draft.session, sessionID, (s) => s.id)
-              if (match.found) draft.session[match.index] = session.data!
+              if (match.found) {
+                const existing = draft.session[match.index]
+                if (!existing || existing.time.updated <= session.data!.time.updated) {
+                  draft.session[match.index] = session.data!
+                }
+              }
               if (!match.found) draft.session.splice(match.index, 0, session.data!)
               draft.todo[sessionID] = todo.data ?? []
-              draft.message[sessionID] = messages.data!.map((x) => x.info)
+              const existing = draft.message[sessionID] ?? []
+              const merged = messages.data!.map((x) => {
+                const incoming = x.info
+                const found = Binary.search(existing, incoming.id, (m) => m.id)
+                if (!found.found) return incoming
+
+                const previous = existing[found.index]
+                if (previous.role !== "assistant") return incoming
+                if (incoming.role !== "assistant") return incoming
+
+                const previousCompleted = previous.time.completed
+                const incomingCompleted = incoming.time.completed
+                if (previousCompleted && !incomingCompleted) return previous
+                if (previousCompleted && incomingCompleted && incomingCompleted <= previousCompleted) return previous
+
+                return incoming
+              })
+              // Keep any messages we already have that the fetch didn't include yet.
+              for (const msg of existing) {
+                const found = Binary.search(merged, msg.id, (m) => m.id)
+                if (!found.found) merged.splice(found.index, 0, msg)
+              }
+              draft.message[sessionID] = merged
               for (const message of messages.data!) {
                 draft.part[message.info.id] = message.parts
               }

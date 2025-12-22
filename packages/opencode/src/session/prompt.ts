@@ -1482,6 +1482,9 @@ export namespace SessionPrompt {
     if (exec.ok) {
       if (exec.result.cwd) {
         Shell.setCwd(exec.result.cwd)
+        await Session.update(input.sessionID, (draft) => {
+          draft.directory = exec.result.cwd!
+        })
       }
 
       if (!output) {

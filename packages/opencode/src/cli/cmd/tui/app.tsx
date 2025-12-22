@@ -189,10 +189,30 @@ function App() {
 
     const data = route.data as SessionRoute
     const messages = sync.data.message[data.sessionID] ?? []
-    const lastAssistant = messages.findLast((m) => m.role === "assistant")
-    if (!lastAssistant) return
-    setWorkingDir(lastAssistant.path.cwd)
+    let latest: (typeof messages)[number] | undefined
+    for (const message of messages) {
+      if (message.role !== "assistant") continue
+      if (!latest || message.id > latest.id) {
+        latest = message
+      }
+    }
+    if (latest) {
+      if (workingDir() !== latest.path.cwd) {
+        // console.log("Updating workingDir from message", latest.path.cwd)
+        setWorkingDir(latest.path.cwd)
+      }
+      return
+    }
+
+    const session = sync.session.get(data.sessionID)
+    if (session) {
+      if (workingDir() !== session.directory) {
+        // console.log("Updating workingDir from session", session.directory)
+        setWorkingDir(session.directory)
+      }
+    }
   })
+
 
   useKeyboard(async (evt) => {
     if (!Installation.isLocal()) return
@@ -407,7 +427,8 @@ function App() {
   createEffect(() => {
     if (route.data.type === "session") return
     const interval = setInterval(() => {
-      setWorkingDir(Shell.getCwd())
+      const currentDir = Shell.getCwd()
+      setWorkingDir(currentDir)
     }, 500)
     return () => clearInterval(interval)
   })
