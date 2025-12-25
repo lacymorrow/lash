@@ -61,13 +61,7 @@ export const auth = new sst.cloudflare.Worker("AuthApi", {
   domain: `auth.${domain}`,
   handler: "packages/console/function/src/auth.ts",
   url: true,
-  link: [
-    database,
-    authStorage,
-    GITHUB_CLIENT_ID_CONSOLE,
-    GITHUB_CLIENT_SECRET_CONSOLE,
-    GOOGLE_CLIENT_ID,
-  ],
+  link: [database, authStorage, GITHUB_CLIENT_ID_CONSOLE, GITHUB_CLIENT_SECRET_CONSOLE, GOOGLE_CLIENT_ID],
 })
 
 ////////////////
@@ -103,8 +97,14 @@ export const stripeWebhook = new stripe.WebhookEndpoint("StripeWebhookEndpoint",
   ],
 })
 
-const ZEN_MODELS1 = new sst.Secret("ZEN_MODELS1")
-const ZEN_MODELS2 = new sst.Secret("ZEN_MODELS2")
+const ZEN_MODELS = [
+  new sst.Secret("ZEN_MODELS1"),
+  new sst.Secret("ZEN_MODELS2"),
+  new sst.Secret("ZEN_MODELS3"),
+  new sst.Secret("ZEN_MODELS4"),
+  new sst.Secret("ZEN_MODELS5"),
+  new sst.Secret("ZEN_MODELS6"),
+]
 const STRIPE_SECRET_KEY = new sst.Secret("STRIPE_SECRET_KEY")
 const AUTH_API_URL = new sst.Linkable("AUTH_API_URL", {
   properties: { value: auth.url.apply((url) => url!) },
@@ -112,10 +112,14 @@ const AUTH_API_URL = new sst.Linkable("AUTH_API_URL", {
 const STRIPE_WEBHOOK_SECRET = new sst.Linkable("STRIPE_WEBHOOK_SECRET", {
   properties: { value: stripeWebhook.secret },
 })
+const gatewayKv = new sst.cloudflare.Kv("GatewayKv")
 
 ////////////////
 // CONSOLE
 ////////////////
+
+const bucket = new sst.cloudflare.Bucket("ZenData")
+const bucketNew = new sst.cloudflare.Bucket("ZenDataNew")
 
 const AWS_SES_ACCESS_KEY_ID = new sst.Secret("AWS_SES_ACCESS_KEY_ID")
 const AWS_SES_SECRET_ACCESS_KEY = new sst.Secret("AWS_SES_SECRET_ACCESS_KEY")
@@ -133,15 +137,23 @@ new sst.cloudflare.x.SolidStart("Console", {
   domain,
   path: "packages/console/app",
   link: [
+    bucket,
+    bucketNew,
     database,
     AUTH_API_URL,
     STRIPE_WEBHOOK_SECRET,
     STRIPE_SECRET_KEY,
-    ZEN_MODELS1,
-    ZEN_MODELS2,
     EMAILOCTOPUS_API_KEY,
     AWS_SES_ACCESS_KEY_ID,
     AWS_SES_SECRET_ACCESS_KEY,
+    ...ZEN_MODELS,
+    ...($dev
+      ? [
+          new sst.Secret("CLOUDFLARE_DEFAULT_ACCOUNT_ID", process.env.CLOUDFLARE_DEFAULT_ACCOUNT_ID!),
+          new sst.Secret("CLOUDFLARE_API_TOKEN", process.env.CLOUDFLARE_API_TOKEN!),
+        ]
+      : []),
+    gatewayKv,
   ],
   environment: {
     //VITE_DOCS_URL: web.url.apply((url) => url!),

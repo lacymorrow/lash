@@ -1,5 +1,7 @@
-import { type FileContents, File, FileOptions, LineAnnotation } from "@pierre/precision-diffs"
-import { ComponentProps, createEffect, splitProps } from "solid-js"
+import { type FileContents, File, FileOptions, LineAnnotation } from "@pierre/diffs"
+import { ComponentProps, createEffect, createMemo, splitProps } from "solid-js"
+import { createDefaultOptions, styleVariables } from "../pierre"
+import { workerPool } from "../pierre/worker"
 
 export type CodeProps<T = {}> = FileOptions<T> & {
   file: FileContents
@@ -11,20 +13,22 @@ export type CodeProps<T = {}> = FileOptions<T> & {
 export function Code<T>(props: CodeProps<T>) {
   let container!: HTMLDivElement
   const [local, others] = splitProps(props, ["file", "class", "classList", "annotations"])
-  const file = () => local.file
+
+  const file = createMemo(
+    () =>
+      new File<T>(
+        {
+          ...createDefaultOptions<T>("unified"),
+          ...others,
+        },
+        workerPool,
+      ),
+  )
 
   createEffect(() => {
-    const instance = new File<T>({
-      theme: { dark: "oc-1-dark", light: "oc-1-light" }, // or any Shiki theme
-      overflow: "wrap", // or 'scroll'
-      themeType: "system", // 'system', 'light', or 'dark'
-      disableLineNumbers: false, // optional
-      // lang: 'typescript', // optional - auto-detected from filename if not provided
-      ...others,
-    })
-
-    instance.render({
-      file: file(),
+    container.innerHTML = ""
+    file().render({
+      file: local.file,
       lineAnnotations: local.annotations,
       containerWrapper: container,
     })
@@ -33,15 +37,7 @@ export function Code<T>(props: CodeProps<T>) {
   return (
     <div
       data-component="code"
-      style={{
-        "--pjs-font-family": "var(--font-family-mono)",
-        "--pjs-font-size": "var(--font-size-small)",
-        "--pjs-line-height": "24px",
-        "--pjs-tab-size": 2,
-        "--pjs-font-features": "var(--font-family-mono--font-feature-settings)",
-        "--pjs-header-font-family": "var(--font-family-sans)",
-        "--pjs-gap-block": 0,
-      }}
+      style={styleVariables}
       classList={{
         ...(local.classList || {}),
         [local.class ?? ""]: !!local.class,

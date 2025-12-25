@@ -3,7 +3,7 @@ title: Permissions
 description: Control which actions require approval to run.
 ---
 
-By default, OpenCode **allows all operations** without requiring explicit approval. You can configure this using the `permission` option.
+By default, OpenCode allows most operations without approval, except `doom_loop` and `external_directory` which default to `ask`. You can configure this using the `permission` option.
 
 ```json title="opencode.json"
 {
@@ -11,12 +11,15 @@ By default, OpenCode **allows all operations** without requiring explicit approv
   "permission": {
     "edit": "allow",
     "bash": "ask",
-    "webfetch": "deny"
+    "skill": "ask",
+    "webfetch": "deny",
+    "doom_loop": "ask",
+    "external_directory": "ask"
   }
 }
 ```
 
-This lets you configure granular controls for the `edit`, `bash`, and `webfetch` tools.
+This lets you configure granular controls for the `edit`, `bash`, `skill`, `webfetch`, `doom_loop`, and `external_directory` tools.
 
 - `"ask"` — Prompt for approval before running the tool
 - `"allow"` — Allow all operations without approval
@@ -26,7 +29,7 @@ This lets you configure granular controls for the `edit`, `bash`, and `webfetch`
 
 ## Tools
 
-Currently, the permissions for the `edit`, `bash`, and `webfetch` tools can be configured through the `permission` option.
+Currently, the permissions for the `edit`, `bash`, `skill`, `webfetch`, `doom_loop`, and `external_directory` tools can be configured through the `permission` option.
 
 ---
 
@@ -130,6 +133,50 @@ The wildcard uses simple regex globbing patterns.
 
 ---
 
+#### Scope of the `"ask"` option
+
+When the agent asks for permission to run a particular bash command, it will
+request feedback with the three options "accept", "accept always" and "deny".
+The "accept always" answer applies for the rest of the current session.
+
+In addition, command permissions are applied to the first two elements of a command. So, an "accept always" response for a command like `git log` would whitelist `git log *` but not `git commit ...`.
+
+When an agent asks for permission to run a command in a pipeline, we use tree sitter to parse each command in the pipeline. The "accept always" permission thus applies separately to each command in the pipeline.
+
+---
+
+### skill
+
+Use the `permission.skill` key to control whether the model can load skills via the built-in `skill` tool.
+
+You can apply a single rule to all skills:
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "skill": "ask"
+  }
+}
+```
+
+Or configure per-skill rules (supports the same wildcard patterns as `permission.bash`):
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "skill": {
+      "*": "deny",
+      "git-*": "allow",
+      "frontend/*": "ask"
+    }
+  }
+}
+```
+
+---
+
 ### webfetch
 
 Use the `permission.webfetch` key to control whether the LLM can fetch web pages.
@@ -139,6 +186,40 @@ Use the `permission.webfetch` key to control whether the LLM can fetch web pages
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "webfetch": "ask"
+  }
+}
+```
+
+---
+
+### doom_loop
+
+Use the `permission.doom_loop` key to control whether approval is required when a doom loop is detected. A doom loop occurs when the same tool is called 3 times in a row with identical arguments.
+
+This helps prevent infinite loops where the LLM repeatedly attempts the same action without making progress.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "doom_loop": "ask"
+  }
+}
+```
+
+---
+
+### external_directory
+
+Use the `permission.external_directory` key to control whether file operations require approval when accessing files outside the working directory.
+
+This provides an additional safety layer to prevent unintended modifications to files outside your project.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "external_directory": "ask"
   }
 }
 ```
@@ -187,4 +268,3 @@ permission:
 
 Only analyze code and suggest changes.
 ```
-

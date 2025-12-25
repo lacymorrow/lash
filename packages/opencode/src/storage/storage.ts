@@ -5,7 +5,7 @@ import { Global } from "../global"
 import { lazy } from "../util/lazy"
 import { Lock } from "../util/lock"
 import { $ } from "bun"
-import { NamedError } from "@/util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import z from "zod"
 
 export namespace Storage {
@@ -85,9 +85,7 @@ export namespace Storage {
             const session = await Bun.file(sessionFile).json()
             await Bun.write(dest, JSON.stringify(session))
             log.info(`migrating messages for session ${session.id}`)
-            for await (const msgFile of new Bun.Glob(
-              `storage/session/message/${session.id}/*.json`,
-            ).scan({
+            for await (const msgFile of new Bun.Glob(`storage/session/message/${session.id}/*.json`).scan({
               cwd: fullProjectDir,
               absolute: true,
             })) {
@@ -100,12 +98,12 @@ export namespace Storage {
               await Bun.write(dest, JSON.stringify(message))
 
               log.info(`migrating parts for message ${message.id}`)
-              for await (const partFile of new Bun.Glob(
-                `storage/session/part/${session.id}/${message.id}/*.json`,
-              ).scan({
-                cwd: fullProjectDir,
-                absolute: true,
-              })) {
+              for await (const partFile of new Bun.Glob(`storage/session/part/${session.id}/${message.id}/*.json`).scan(
+                {
+                  cwd: fullProjectDir,
+                  absolute: true,
+                },
+              )) {
                 const dest = path.join(dir, "part", message.id, path.basename(partFile))
                 const part = await Bun.file(partFile).json()
                 log.info("copying", {
@@ -128,9 +126,7 @@ export namespace Storage {
         if (!session.projectID) continue
         if (!session.summary?.diffs) continue
         const { diffs } = session.summary
-        await Bun.file(path.join(dir, "session_diff", session.id + ".json")).write(
-          JSON.stringify(diffs),
-        )
+        await Bun.file(path.join(dir, "session_diff", session.id + ".json")).write(JSON.stringify(diffs))
         await Bun.file(path.join(dir, "session", session.projectID, session.id + ".json")).write(
           JSON.stringify({
             ...session,
@@ -174,7 +170,8 @@ export namespace Storage {
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
       using _ = await Lock.read(target)
-      return Bun.file(target).json() as Promise<T>
+      const result = await Bun.file(target).json()
+      return result as T
     })
   }
 
@@ -182,7 +179,7 @@ export namespace Storage {
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
-      using _ = await Lock.write("storage")
+      using _ = await Lock.write(target)
       const content = await Bun.file(target).json()
       fn(content)
       await Bun.write(target, JSON.stringify(content, null, 2))
@@ -194,7 +191,7 @@ export namespace Storage {
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
-      using _ = await Lock.write("storage")
+      using _ = await Lock.write(target)
       await Bun.write(target, JSON.stringify(content, null, 2))
     })
   }

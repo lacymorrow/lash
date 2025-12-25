@@ -8,8 +8,18 @@ import { Actor } from "./actor"
 import { Resource } from "@opencode-ai/console-resource"
 
 export namespace ZenData {
-  const FormatSchema = z.enum(["anthropic", "openai", "oa-compat"])
+  const FormatSchema = z.enum(["anthropic", "google", "openai", "oa-compat"])
+  const TrialSchema = z.object({
+    provider: z.string(),
+    limits: z.array(
+      z.object({
+        limit: z.number(),
+        client: z.enum(["cli", "desktop"]).optional(),
+      }),
+    ),
+  })
   export type Format = z.infer<typeof FormatSchema>
+  export type Trial = z.infer<typeof TrialSchema>
 
   const ModelCostSchema = z.object({
     input: z.number(),
@@ -24,12 +34,18 @@ export namespace ZenData {
     cost: ModelCostSchema,
     cost200K: ModelCostSchema.optional(),
     allowAnonymous: z.boolean().optional(),
+    byokProvider: z.enum(["openai", "anthropic", "google"]).optional(),
+    stickyProvider: z.boolean().optional(),
+    trial: TrialSchema.optional(),
+    rateLimit: z.number().optional(),
+    fallbackProvider: z.string().optional(),
     providers: z.array(
       z.object({
         id: z.string(),
         model: z.string(),
         weight: z.number().optional(),
         disabled: z.boolean().optional(),
+        storeModel: z.string().optional(),
       }),
     ),
   })
@@ -42,7 +58,7 @@ export namespace ZenData {
   })
 
   const ModelsSchema = z.object({
-    models: z.record(z.string(), ModelSchema),
+    models: z.record(z.string(), z.union([ModelSchema, z.array(ModelSchema.extend({ formatFilter: FormatSchema }))])),
     providers: z.record(z.string(), ProviderSchema),
   })
 
@@ -51,7 +67,14 @@ export namespace ZenData {
   })
 
   export const list = fn(z.void(), () => {
-    const json = JSON.parse(Resource.ZEN_MODELS1.value + Resource.ZEN_MODELS2.value)
+    const json = JSON.parse(
+      Resource.ZEN_MODELS1.value +
+        Resource.ZEN_MODELS2.value +
+        Resource.ZEN_MODELS3.value +
+        Resource.ZEN_MODELS4.value +
+        Resource.ZEN_MODELS5.value +
+        Resource.ZEN_MODELS6.value,
+    )
     return ModelsSchema.parse(json)
   })
 }
@@ -60,9 +83,7 @@ export namespace Model {
   export const enable = fn(z.object({ model: z.string() }), ({ model }) => {
     Actor.assertAdmin()
     return Database.use((db) =>
-      db
-        .delete(ModelTable)
-        .where(and(eq(ModelTable.workspaceID, Actor.workspace()), eq(ModelTable.model, model))),
+      db.delete(ModelTable).where(and(eq(ModelTable.workspaceID, Actor.workspace()), eq(ModelTable.model, model))),
     )
   })
 

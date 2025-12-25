@@ -18,6 +18,12 @@ import { Instance } from "../project/instance"
 import { Agent } from "../agent/agent"
 import { Snapshot } from "@/snapshot"
 
+const MAX_DIAGNOSTICS_PER_FILE = 20
+
+function normalizeLineEndings(text: string): string {
+  return text.replaceAll("\r\n", "\n")
+}
+
 export const EditTool = Tool.define("edit", {
   description: DESCRIPTION,
   parameters: z.object({
@@ -35,16 +41,42 @@ export const EditTool = Tool.define("edit", {
       throw new Error("oldString and newString must be different")
     }
 
+    const agent = await Agent.get(ctx.agent)
+
     const filePath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
     if (!Filesystem.contains(Instance.directory, filePath)) {
-      throw new Error(`File ${filePath} is not in the current working directory`)
+      const parentDir = path.dirname(filePath)
+      if (agent.permission.external_directory === "ask") {
+        await Permission.ask({
+          type: "external_directory",
+          pattern: [parentDir, path.join(parentDir, "*")],
+          sessionID: ctx.sessionID,
+          messageID: ctx.messageID,
+          callID: ctx.callID,
+          title: `Edit file outside working directory: ${filePath}`,
+          metadata: {
+            filepath: filePath,
+            parentDir,
+          },
+        })
+      } else if (agent.permission.external_directory === "deny") {
+        throw new Permission.RejectedError(
+          ctx.sessionID,
+          "external_directory",
+          ctx.callID,
+          {
+            filepath: filePath,
+            parentDir,
+          },
+          `File ${filePath} is not in the current working directory`,
+        )
+      }
     }
 
-    const agent = await Agent.get(ctx.agent)
     let diff = ""
     let contentOld = ""
     let contentNew = ""
-    await (async () => {
+    await FileTime.withLock(filePath, async () => {
       if (params.oldString === "") {
         contentNew = params.newString
         diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
@@ -65,6 +97,7 @@ export const EditTool = Tool.define("edit", {
         await Bus.publish(File.Event.Edited, {
           file: filePath,
         })
+        FileTime.read(ctx.sessionID, filePath)
         return
       }
 
@@ -76,7 +109,9 @@ export const EditTool = Tool.define("edit", {
       contentOld = await file.text()
       contentNew = replace(contentOld, params.oldString, params.newString, params.replaceAll)
 
-      diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
+      diff = trimDiff(
+        createTwoFilesPatch(filePath, filePath, normalizeLineEndings(contentOld), normalizeLineEndings(contentNew)),
+      )
       if (agent.permission.edit === "ask") {
         await Permission.ask({
           type: "edit",
@@ -96,23 +131,23 @@ export const EditTool = Tool.define("edit", {
         file: filePath,
       })
       contentNew = await file.text()
-      diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
-    })()
-
-    FileTime.read(ctx.sessionID, filePath)
+      diff = trimDiff(
+        createTwoFilesPatch(filePath, filePath, normalizeLineEndings(contentOld), normalizeLineEndings(contentNew)),
+      )
+      FileTime.read(ctx.sessionID, filePath)
+    })
 
     let output = ""
     await LSP.touchFile(filePath, true)
     const diagnostics = await LSP.diagnostics()
-    for (const [file, issues] of Object.entries(diagnostics)) {
-      if (issues.length === 0) continue
-      if (file === filePath) {
-        output += `\nThis file has errors, please fix\n<file_diagnostics>\n${issues
-          .filter((item) => item.severity === 1)
-          .map(LSP.Diagnostic.pretty)
-          .join("\n")}\n</file_diagnostics>\n`
-        continue
-      }
+    const normalizedFilePath = Filesystem.normalizePath(filePath)
+    const issues = diagnostics[normalizedFilePath] ?? []
+    if (issues.length > 0) {
+      const errors = issues.filter((item) => item.severity === 1)
+      const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
+      const suffix =
+        errors.length > MAX_DIAGNOSTICS_PER_FILE ? `\n... and ${errors.length - MAX_DIAGNOSTICS_PER_FILE} more` : ""
+      output += `\nThis file has errors, please fix\n<file_diagnostics>\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</file_diagnostics>\n`
     }
 
     const filediff: Snapshot.FileDiff = {

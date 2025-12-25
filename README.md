@@ -26,9 +26,29 @@ curl -fsSL https://raw.githubusercontent.com/lacymorrow/lash/main/install | bash
 ```
 
 ### Homebrew
+
 ```bash
 brew install lacymorrow/tap/lash
 ```
+```bash
+brew install lacymorrow/tap/lash
+```
+
+### Agents
+
+OpenCode includes two built-in agents you can switch between,
+you can switch between these using the `Tab` key.
+
+- **build** - Default, full access agent for development work
+- **plan** - Read-only agent for analysis and code exploration
+  - Denies file edits by default
+  - Asks permission before running bash commands
+  - Ideal for exploring unfamiliar codebases or planning changes
+
+Also, included is a **general** subagent for complex searches and multi-step tasks.
+This is used internally and can be invoked using `@general` in messages.
+
+Learn more about [agents](https://opencode.ai/docs/agents).
 
 ### Documentation
 

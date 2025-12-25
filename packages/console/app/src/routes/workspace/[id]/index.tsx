@@ -5,6 +5,7 @@ import { NewUserSection } from "./new-user-section"
 import { UsageSection } from "./usage-section"
 import { ModelSection } from "./model-section"
 import { ProviderSection } from "./provider-section"
+import { GraphSection } from "./graph-section"
 import { IconLogo } from "~/component/icon"
 import { querySessionInfo, queryBillingInfo, createCheckoutUrl, formatBalance } from "../common"
 
@@ -51,9 +52,7 @@ export default function () {
                     disabled={checkoutSubmission.pending || store.checkoutRedirecting}
                     onClick={onClickCheckout}
                   >
-                    {checkoutSubmission.pending || store.checkoutRedirecting
-                      ? "Loading..."
-                      : "Enable billing"}
+                    {checkoutSubmission.pending || store.checkoutRedirecting ? "Loading..." : "Enable billing"}
                   </button>
                 }
               >
@@ -68,6 +67,9 @@ export default function () {
 
       <div data-slot="sections">
         <NewUserSection />
+        <Show when={userInfo()?.isAdmin}>
+          <GraphSection />
+        </Show>
         <ModelSection />
         <Show when={userInfo()?.isAdmin}>
           <ProviderSection />

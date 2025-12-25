@@ -33,6 +33,7 @@ export const oaCompatHelper = {
       ...(body.stream ? { stream_options: { include_usage: true } } : {}),
     }
   },
+  streamSeparator: "\n\n",
   createUsageParser: () => {
     let usage: Usage
 
@@ -532,7 +533,9 @@ export function toOaCompatibleChunk(chunk: CommonChunk): string {
       total_tokens: chunk.usage.total_tokens,
       ...(chunk.usage.prompt_tokens_details?.cached_tokens
         ? {
-            prompt_tokens_details: { cached_tokens: chunk.usage.prompt_tokens_details.cached_tokens },
+            prompt_tokens_details: {
+              cached_tokens: chunk.usage.prompt_tokens_details.cached_tokens,
+            },
           }
         : {}),
     }

@@ -1,17 +1,21 @@
 import { Provider } from "@/provider/provider"
+
 import { fn } from "@/util/fn"
 import z from "zod"
 import { Session } from "."
-import { generateText, type ModelMessage } from "ai"
+
 import { MessageV2 } from "./message-v2"
 import { Identifier } from "@/id/id"
 import { Snapshot } from "@/snapshot"
-import { ProviderTransform } from "@/provider/transform"
-import { SystemPrompt } from "./system"
+
 import { Log } from "@/util/log"
 import path from "path"
 import { Instance } from "@/project/instance"
 import { Storage } from "@/storage/storage"
+import { Bus } from "@/bus"
+
+import { LLM } from "./llm"
+import { Agent } from "@/agent/agent"
 
 export namespace SessionSummary {
   const log = Log.create({ service: "session.summary" })
@@ -22,7 +26,7 @@ export namespace SessionSummary {
       messageID: z.string(),
     }),
     async (input) => {
-      const all = await Session.messages(input.sessionID)
+      const all = await Session.messages({ sessionID: input.sessionID })
       await Promise.all([
         summarizeSession({ sessionID: input.sessionID, messages: all }),
         summarizeMessage({ messageID: input.messageID, messages: all }),
@@ -47,16 +51,19 @@ export namespace SessionSummary {
       draft.summary = {
         additions: diffs.reduce((sum, x) => sum + x.additions, 0),
         deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
+        files: diffs.length,
       }
     })
     await Storage.write(["session_diff", input.sessionID], diffs)
+    Bus.publish(Session.Event.Diff, {
+      sessionID: input.sessionID,
+      diff: diffs,
+    })
   }
 
   async function summarizeMessage(input: { messageID: string; messages: MessageV2.WithParts[] }) {
     const messages = input.messages.filter(
-      (m) =>
-        m.info.id === input.messageID ||
-        (m.info.role === "assistant" && m.info.parentID === input.messageID),
+      (m) => m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
     )
     const msgWithParts = messages.find((m) => m.info.id === input.messageID)!
     const userMsg = msgWithParts.info as MessageV2.User
@@ -67,25 +74,21 @@ export namespace SessionSummary {
     }
     await Session.updateMessage(userMsg)
 
-    const assistantMsg = messages.find((m) => m.info.role === "assistant")!
-      .info as MessageV2.Assistant
-    const small = await Provider.getSmallModel(assistantMsg.providerID)
-    if (!small) return
+    const assistantMsg = messages.find((m) => m.info.role === "assistant")!.info as MessageV2.Assistant
+    const small =
+      (await Provider.getSmallModel(assistantMsg.providerID)) ??
+      (await Provider.getModel(assistantMsg.providerID, assistantMsg.modelID))
 
-    const textPart = msgWithParts.parts.find(
-      (p) => p.type === "text" && !p.synthetic,
-    ) as MessageV2.TextPart
+    const textPart = msgWithParts.parts.find((p) => p.type === "text" && !p.synthetic) as MessageV2.TextPart
     if (textPart && !userMsg.summary?.title) {
-      const result = await generateText({
-        maxOutputTokens: small.info.reasoning ? 1500 : 20,
-        providerOptions: ProviderTransform.providerOptions(small.npm, small.providerID, {}),
+      const agent = await Agent.get("title")
+      const stream = await LLM.stream({
+        agent,
+        user: userMsg,
+        tools: {},
+        model: agent.model ? await Provider.getModel(agent.model.providerID, agent.model.modelID) : small,
+        small: true,
         messages: [
-          ...SystemPrompt.title(small.providerID).map(
-            (x): ModelMessage => ({
-              role: "system",
-              content: x,
-            }),
-          ),
           {
             role: "user" as const,
             content: `
@@ -96,45 +99,57 @@ export namespace SessionSummary {
             `,
           },
         ],
-        headers: small.info.headers,
-        model: small.language,
+        abort: new AbortController().signal,
+        sessionID: userMsg.sessionID,
+        system: [],
+        retries: 3,
       })
-      log.info("title", { title: result.text })
-      userMsg.summary.title = result.text
+      const result = await stream.text
+      log.info("title", { title: result })
+      userMsg.summary.title = result
       await Session.updateMessage(userMsg)
     }
 
     if (
       messages.some(
         (m) =>
-          m.info.role === "assistant" &&
-          m.parts.some((p) => p.type === "step-finish" && p.reason !== "tool-calls"),
+          m.info.role === "assistant" && m.parts.some((p) => p.type === "step-finish" && p.reason !== "tool-calls"),
       )
     ) {
-      let summary = messages
-        .findLast((m) => m.info.role === "assistant")
-        ?.parts.findLast((p) => p.type === "text")?.text
-      if (!summary || diffs.length > 0) {
-        const result = await generateText({
-          model: small.language,
-          maxOutputTokens: 100,
+      if (diffs.length > 0) {
+        for (const msg of messages) {
+          for (const part of msg.parts) {
+            if (part.type === "tool" && part.state.status === "completed") {
+              part.state.output = "[TOOL OUTPUT PRUNED]"
+            }
+          }
+        }
+        const summaryAgent = await Agent.get("summary")
+        const stream = await LLM.stream({
+          agent: summaryAgent,
+          user: userMsg,
+          tools: {},
+          model: summaryAgent.model
+            ? await Provider.getModel(summaryAgent.model.providerID, summaryAgent.model.modelID)
+            : small,
+          small: true,
           messages: [
+            ...MessageV2.toModelMessage(messages),
             {
-              role: "user",
-              content: `
-            Summarize the following conversation into 2 sentences MAX explaining what the assistant did and why. Do not explain the user's input. Do not speak in the third person about the assistant.
-            <conversation>
-            ${JSON.stringify(MessageV2.toModelMessage(messages))}
-            </conversation>
-            `,
+              role: "user" as const,
+              content: `Summarize the above conversation according to your system prompts.`,
             },
           ],
-          headers: small.info.headers,
-        }).catch(() => {})
-        if (result) summary = result.text
+          abort: new AbortController().signal,
+          sessionID: userMsg.sessionID,
+          system: [],
+          retries: 3,
+        })
+        const result = await stream.text
+        if (result) {
+          userMsg.summary.body = result
+        }
       }
-      userMsg.summary.body = summary
-      log.info("body", { body: summary })
       await Session.updateMessage(userMsg)
     }
   }
@@ -145,17 +160,7 @@ export namespace SessionSummary {
       messageID: Identifier.schema("message").optional(),
     }),
     async (input) => {
-      let all = await Session.messages(input.sessionID)
-      if (input.messageID)
-        all = all.filter(
-          (x) =>
-            x.info.id === input.messageID ||
-            (x.info.role === "assistant" && x.info.parentID === input.messageID),
-        )
-
-      return computeDiff({
-        messages: all,
-      })
+      return Storage.read<Snapshot.FileDiff[]>(["session_diff", input.sessionID]).catch(() => [])
     },
   )
 

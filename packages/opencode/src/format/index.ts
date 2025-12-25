@@ -28,6 +28,14 @@ export namespace Format {
     const cfg = await Config.get()
 
     const formatters: Record<string, Formatter.Info> = {}
+    if (cfg.formatter === false) {
+      log.info("all formatters are disabled")
+      return {
+        enabled,
+        formatters,
+      }
+    }
+
     for (const item of Object.values(Formatter)) {
       formatters[item.name] = item
     }
@@ -41,6 +49,9 @@ export namespace Format {
         extensions: [],
         ...item,
       })
+
+      if (result.command.length === 0) continue
+
       result.enabled = async () => true
       result.name = name
       formatters[name] = result
@@ -113,13 +124,12 @@ export namespace Format {
               ...item.environment,
             })
         } catch (error) {
-          log.error("failed", {
+          log.error("failed to format file", {
             error,
             command: item.command,
             ...item.environment,
+            file,
           })
-          // re-raising
-          throw error
         }
       }
     })
