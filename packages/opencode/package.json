@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.0.7",
+  "version": "0.0.0-lash-202512231608",
   "name": "lash-cli",
   "description": "lash - The AI coding agent built for the terminal",
   "type": "module",
@@ -39,7 +39,9 @@
     "@ai-sdk/amazon-bedrock": "2.2.10",
     "@ai-sdk/google-vertex": "3.0.16",
     "@babel/core": "7.28.4",
+    "@babel/preset-typescript": "7.26.0",
     "@octokit/webhooks-types": "7.6.1",
+    "@opencode-ai/script": "workspace:*",
     "@parcel/watcher-darwin-arm64": "2.5.1",
     "@parcel/watcher-darwin-x64": "2.5.1",
     "@parcel/watcher-linux-arm64-glibc": "2.5.1",
@@ -51,12 +53,12 @@
     "@types/bun": "catalog:",
     "@types/turndown": "5.0.5",
     "@types/yargs": "17.0.33",
-    "typescript": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "babel-preset-solid": "1.9.10",
+    "typescript": "catalog:",
     "vscode-languageserver-types": "3.17.5",
     "why-is-node-running": "3.2.2",
-    "zod-to-json-schema": "3.24.5",
-    "@opencode-ai/script": "workspace:*"
+    "zod-to-json-schema": "3.24.5"
   },
   "dependencies": {
     "@actions/core": "1.11.1",

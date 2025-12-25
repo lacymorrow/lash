@@ -1209,13 +1209,6 @@ export type EventMessagePartRemoved = {
   }
 }
 
-export type EventSessionCompacted = {
-  type: "session.compacted"
-  properties: {
-    sessionID: string
-  }
-}
-
 export type Permission = {
   id: string
   type: string
@@ -1243,6 +1236,13 @@ export type EventPermissionReplied = {
     sessionID: string
     permissionID: string
     response: string
+  }
+}
+
+export type EventSessionCompacted = {
+  type: "session.compacted"
+  properties: {
+    sessionID: string
   }
 }
 
@@ -1335,9 +1335,9 @@ export type Event =
   | EventMessageRemoved
   | EventMessagePartUpdated
   | EventMessagePartRemoved
-  | EventSessionCompacted
   | EventPermissionUpdated
   | EventPermissionReplied
+  | EventSessionCompacted
   | EventFileEdited
   | EventFileWatcherUpdated
   | EventTodoUpdated
