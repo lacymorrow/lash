@@ -1,10 +1,22 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
+import { createInterface } from "readline"
 import pkg from "../package.json"
 
 const version = process.env["LASH_VERSION"] || process.env["OPENCODE_VERSION"] || pkg.version
 const dry = process.env["DRY_RUN"] === "true"
-const otp = process.env["NPM_OTP"] || ""
+
+const prompt = (query: string) => new Promise<string>((resolve) => {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+  rl.question(query, (answer) => {
+    rl.close()
+    resolve(answer.trim())
+  })
+})
+
 
 console.log(`🚀 Publishing lash v${version}`)
 if (dry) console.log("(DRY RUN - no actual publishing)")
@@ -25,8 +37,11 @@ const targets = [
   ["darwin", "arm64"],
 ]
 
-// Clean dist directory
-await $`rm -rf dist/lash-*`
+// Resolve packages/opencode relative to script location
+const opencodeDir = new URL("..", import.meta.url).pathname
+
+// Clean dist directory relative to opencodeDir
+await $`rm -rf dist/lash-*`.cwd(opencodeDir).nothrow()
 
 const optionalDependencies: Record<string, string> = {}
 
@@ -34,33 +49,111 @@ const optionalDependencies: Record<string, string> = {}
 for (const [os, arch] of targets) {
   const name = `lash-cli-${os}-${arch}`
   console.log(`📦 Building ${name}`)
-  
-  await $`mkdir -p dist/${name}/bin`
-  
+
+  await $`mkdir -p dist/${name}/bin`.cwd(opencodeDir)
+
   // Build TUI component
+  // Resolve packages/tui relative to packages/opencode (../tui)
+  const tuiDir = new URL("../../tui", import.meta.url).pathname
   await $`CGO_ENABLED=0 GOOS=${os} GOARCH=${GOARCH[arch]} go build -ldflags="-s -w -X main.Version=${version}" -o ../opencode/dist/${name}/bin/tui ./cmd/opencode/main.go`.cwd(
-    "../tui",
+    tuiDir,
   )
-  
+
   // Build lash binary with embedded TUI
-  await $`bun build --define OPENCODE_TUI_PATH="'../../../dist/${name}/bin/tui'" --define OPENCODE_VERSION="'${version}'" --compile --target=bun-${os}-${arch} --outfile=dist/${name}/bin/lash ./src/index.ts --embed ./dist/${name}/bin/tui`
-  
+  // Dynamic externals logic:
+  // We must externalize packages we don't have (to avoid build errors).
+  // We should bundle packages we DO have (to make the binary work).
+  // We typically only have the package for the current host platform.
+  // So: Externalize ALL platform packages EXCEPT the one for the current host (if target matches host).
+
+  // List of all platform components we know of
+  const opentuiPlatforms = [
+    "@opentui/core-win32-x64",
+    "@opentui/core-linux-x64",
+    "@opentui/core-linux-arm64",
+    "@opentui/core-darwin-x64",
+    "@opentui/core-darwin-arm64",
+  ]
+  const watcherPlatforms = [
+    "@parcel/watcher-win32-x64",
+    "@parcel/watcher-linux-x64-glibc",
+    "@parcel/watcher-linux-arm64-glibc",
+    "@parcel/watcher-darwin-x64",
+    "@parcel/watcher-darwin-arm64",
+  ]
+  const humblePlatforms = [
+    "@humble/core-darwin-arm64",
+    "@humble/core-darwin-x64",
+    "@humble/core-linux-arm64",
+    "@humble/core-linux-x64",
+    "@humble/core-win32-x64",
+  ]
+
+  // Helper to check if a package matches current host
+  // "darwin-arm64" matching "@opentui/core-darwin-arm64"
+  // Note: watcher uses glibc suffix for linux.
+  const hostStr = `${process.platform}-${process.arch}` // e.g. darwin-arm64
+  const isHost = (pkg: string) => pkg.includes(hostStr)
+
+  const externals = [
+    ...opentuiPlatforms,
+    ...watcherPlatforms,
+    ...humblePlatforms
+  ].filter(pkg => {
+    // If we are building for the host platform, we DON'T want to externalize the host package (we want to bundle it).
+    // If we are building for another platform, we externalize everything (since we don't have deps).
+    // Actually, even if building for another platform, externalizing host pkg is fine (it won't be used).
+    // So distinct logic: 
+    // KEEP (bundle) the package IF it matches valid installed deps.
+    // We only have installed deps for `hostStr`.
+    // So: If package matches `hostStr`, KEEP it (don't externalize).
+    // logic: filter returns true to KEEP in externals listing (i.e. exclude from bundle).
+    // So return true if NOT host.
+    return !pkg.includes(process.platform === 'win32' ? 'win32' : process.platform) || !pkg.includes(process.arch)
+  }).flatMap(pkg => ["--external", pkg])
+
+  // Note: The logic above `!pkg.includes(...)` is simplistic.
+  // Better: identify specifically the installed package.
+  // But strict exclusion of the ONE matching package is safer.
+  // Let's rely on exact match if possible, but names vary.
+  // Simple heuristic: If `pkg` contains both platform and arch of HOST, keep it (bundle it). Else externalize.
+  // BUT watcher linux has glibc. `linux-x64` vs `linux-x64-glibc`.
+  // `process.platform` linux, `process.arch` x64.
+  // If host is linux-x64, we have `watcher-linux-x64-glibc`.
+  // My heuristic: `pkg.includes('linux') && pkg.includes('x64')` -> true.
+  // So we bundle it. Good.
+
+  await $`bun build --define OPENCODE_TUI_PATH="'../../../dist/${name}/bin/tui'" --define OPENCODE_VERSION="'${version}'" --compile --target=bun-${os}-${arch} --outfile=dist/${name}/bin/lash ./src/index.ts --embed ./dist/${name}/bin/tui ${externals}`.cwd(opencodeDir)
+
   // Run smoke test on current platform
   if (
     process.platform === (os === "windows" ? "win32" : os) &&
     (process.arch === arch || (process.arch === "x64" && arch === "x64-baseline"))
   ) {
     console.log(`✓ Smoke test: running dist/${name}/bin/lash --version`)
-    await $`./dist/${name}/bin/lash --version`
+    await $`./dist/${name}/bin/lash --version`.cwd(opencodeDir)
     console.log(`✓ Smoke test: checking TUI binary is embedded`)
-    await $`./dist/${name}/bin/lash --help | head -5`
+    await $`./dist/${name}/bin/lash --help | head -5`.cwd(opencodeDir)
   }
-  
+
   // Clean up TUI binary (now embedded in lash binary)
-  await $`rm -rf ./dist/${name}/bin/tui`
-  
+  await $`rm -rf ./dist/${name}/bin/tui`.cwd(opencodeDir)
+
   // Create package.json for platform-specific package
-  await Bun.file(`dist/${name}/package.json`).write(
+  // Note: Bun.file(path) needs absolute path or relative to process.cwd(). Since opencodeDir is absolute, we should construct path there.
+  // However, Bun.file() doesn't chain like $. 
+  // We will assume Bun.file uses process.cwd(). We need to be careful.
+  // The original script was writing to `dist/${name}/package.json` relative to CWD.
+  // If we want consistency, we should use path.join(opencodeDir, ...) or assume running from repo root?
+  // Currently the build puts files in `packages/opencode/dist` (verified).
+  // But mkdir (line 50 now fixed) puts them in `packages/opencode/dist`.
+  // So Bun.file should write to `packages/opencode/dist/...`.
+  // If run from root, `dist` is root/dist. That's WRONG.
+  // The `mkdir` correction handles the directory creation.
+  // We must fix `Bun.file` paths to be absolute using `opencodeDir`.
+
+  const pkgPath = new URL(`../dist/${name}/package.json`, import.meta.url).pathname
+  await Bun.file(pkgPath).write(
     JSON.stringify(
       {
         name,
@@ -75,22 +168,23 @@ for (const [os, arch] of targets) {
       2,
     ),
   )
-  
+
   // Publish platform-specific package
   if (!dry) {
+    const otp = await prompt(`Enter NPM OTP for ${name} (leave empty to skip): `)
     if (otp) {
-      await $`cd dist/${name} && chmod -R 755 . && npm publish --access public --otp=${otp}`
+      await $`cd dist/${name} && chmod -R 755 . && npm publish --access public --otp=${otp}`.cwd(opencodeDir)
     } else {
-      await $`cd dist/${name} && chmod -R 755 . && npm publish --access public`
+      console.log(`Skipping publish for ${name} (no OTP provided)`)
     }
   }
-  
+
   optionalDependencies[name] = version
 }
 
 // Create main lash-cli package
 console.log("📦 Creating main lash-cli package")
-await $`mkdir -p ./dist/lash-cli/bin`
+await $`mkdir -p ./dist/lash-cli/bin`.cwd(opencodeDir)
 
 // Create wrapper script for Unix systems
 const unixWrapper = `#!/bin/sh
@@ -156,8 +250,8 @@ trap '' INT
 exec "$resolved" "$@"
 `
 
-await Bun.file(`./dist/lash-cli/bin/lash`).write(unixWrapper)
-await $`chmod +x ./dist/lash-cli/bin/lash`
+await Bun.file(new URL("../dist/lash-cli/bin/lash", import.meta.url)).write(unixWrapper)
+await $`chmod +x ./dist/lash-cli/bin/lash`.cwd(opencodeDir)
 
 // Create Windows wrapper
 const windowsWrapper = `@IF EXIST "%~dp0\\node.exe" (
@@ -168,7 +262,7 @@ const windowsWrapper = `@IF EXIST "%~dp0\\node.exe" (
   node "%~dp0\\..\\node_modules\\lash-cli-windows-x64\\bin\\lash.exe" %*
 )`
 
-await Bun.file(`./dist/lash-cli/bin/lash.cmd`).write(windowsWrapper)
+await Bun.file(new URL("../dist/lash-cli/bin/lash.cmd", import.meta.url)).write(windowsWrapper)
 
 // Create postinstall script
 const postinstallScript = `#!/usr/bin/env node
@@ -263,10 +357,10 @@ function main() {
 main()
 `
 
-await Bun.file(`./dist/lash-cli/postinstall.mjs`).write(postinstallScript)
+await Bun.file(new URL("../dist/lash-cli/postinstall.mjs", import.meta.url)).write(postinstallScript)
 
 // Create main package.json
-await Bun.file(`./dist/lash-cli/package.json`).write(
+await Bun.file(new URL("../dist/lash-cli/package.json", import.meta.url)).write(
   JSON.stringify(
     {
       name: "lash-cli",
@@ -297,10 +391,11 @@ await Bun.file(`./dist/lash-cli/package.json`).write(
 
 // Publish main package
 if (!dry) {
+  const otp = await prompt(`Enter NPM OTP for lash-cli (leave empty to skip): `)
   if (otp) {
-    await $`cd ./dist/lash-cli && npm publish --access public --otp=${otp}`
+    await $`cd ./dist/lash-cli && npm publish --access public --otp=${otp}`.cwd(opencodeDir)
   } else {
-    await $`cd ./dist/lash-cli && npm publish --access public`
+    console.log(`Skipping publish for lash-cli (no OTP provided)`)
   }
 }
 
@@ -311,22 +406,22 @@ if (!dry) {
   console.log("📦 Creating zip files for GitHub release")
   for (const [os, arch] of targets) {
     const name = `lash-cli-${os}-${arch}`
-    await $`cd dist/${name}/bin && zip -r ../../${name}.zip *`
+    await $`cd dist/${name}/bin && zip -r ../../${name}.zip *`.cwd(opencodeDir)
   }
 
   // Compute SHA256 checksums (use shasum for macOS compatibility)
   const shaOf = async (path: string) =>
-    await $`shasum -a 256 ${path} | cut -d' ' -f1`.text().then((x) => x.trim())
+    await $`shasum -a 256 ${path} | cut -d' ' -f1`.cwd(opencodeDir).text().then((x) => x.trim())
 
-  const linuxArm64Zip = `./dist/lash-cli-linux-arm64.zip`
-  const linuxX64Zip = `./dist/lash-cli-linux-x64.zip`
-  const darwinX64Zip = `./dist/lash-cli-darwin-x64.zip`
-  const darwinArm64Zip = `./dist/lash-cli-darwin-arm64.zip`
+  const linuxArm64Zip = new URL("../dist/lash-cli-linux-arm64.zip", import.meta.url).pathname
+  const linuxX64Zip = new URL("../dist/lash-cli-linux-x64.zip", import.meta.url).pathname
+  const darwinX64Zip = new URL("../dist/lash-cli-darwin-x64.zip", import.meta.url).pathname
+  const darwinArm64Zip = new URL("../dist/lash-cli-darwin-arm64.zip", import.meta.url).pathname
 
-  const arm64Sha = (await Bun.file(linuxArm64Zip).exists()) ? await shaOf(linuxArm64Zip) : ""
-  const x64Sha = (await Bun.file(linuxX64Zip).exists()) ? await shaOf(linuxX64Zip) : ""
-  const macX64Sha = (await Bun.file(darwinX64Zip).exists()) ? await shaOf(darwinX64Zip) : ""
-  const macArm64Sha = (await Bun.file(darwinArm64Zip).exists()) ? await shaOf(darwinArm64Zip) : ""
+  const arm64Sha = (await Bun.file(linuxArm64Zip).exists()) ? await shaOf('./dist/lash-cli-linux-arm64.zip') : ""
+  const x64Sha = (await Bun.file(linuxX64Zip).exists()) ? await shaOf('./dist/lash-cli-linux-x64.zip') : ""
+  const macX64Sha = (await Bun.file(darwinX64Zip).exists()) ? await shaOf('./dist/lash-cli-darwin-x64.zip') : ""
+  const macArm64Sha = (await Bun.file(darwinArm64Zip).exists()) ? await shaOf('./dist/lash-cli-darwin-arm64.zip') : ""
 
   console.log("\n📋 SHA256 Checksums:")
   if (arm64Sha) console.log(`lash-cli-linux-arm64: ${arm64Sha}`)
@@ -387,12 +482,12 @@ if (!dry) {
       "",
     ].join("\n")
 
-    await $`rm -rf ./dist/homebrew-tap`
-    await $`git clone https://${tapToken}@github.com/lacymorrow/homebrew-tap.git ./dist/homebrew-tap`
-    await Bun.file("./dist/homebrew-tap/lash.rb").write(homebrewFormula)
-    await $`cd ./dist/homebrew-tap && git add lash.rb`
-    await $`cd ./dist/homebrew-tap && git commit -m "Update lash to v${version}"`
-    await $`cd ./dist/homebrew-tap && git push`
+    await $`rm -rf ./dist/homebrew-tap`.cwd(opencodeDir)
+    await $`git clone https://${tapToken}@github.com/lacymorrow/homebrew-tap.git ./dist/homebrew-tap`.cwd(opencodeDir)
+    await Bun.file(new URL("../dist/homebrew-tap/Formula/lash.rb", import.meta.url)).write(homebrewFormula)
+    await $`cd ./dist/homebrew-tap && git add Formula/lash.rb`.cwd(opencodeDir)
+    await $`cd ./dist/homebrew-tap && git commit -m "Update lash to v${version}"`.cwd(opencodeDir)
+    await $`cd ./dist/homebrew-tap && git push`.cwd(opencodeDir)
   }
 
   // Create GitHub release and upload assets if GITHUB_TOKEN is available
