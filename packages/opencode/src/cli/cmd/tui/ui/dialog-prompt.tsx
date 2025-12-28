@@ -44,7 +44,7 @@ export function DialogPrompt(props: DialogPromptProps) {
             dialog.clear()
           }}
           keyBindings={[{ name: "return", action: "submit" }]}
-          ref={(val: TextareaRenderable) => (textarea = val)}
+          ref={(val: any) => (textarea = val)}
           initialValue={props.value}
           placeholder="Enter text"
         />

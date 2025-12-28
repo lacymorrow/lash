@@ -345,9 +345,9 @@ export function Prompt(props: PromptProps) {
     const sessionID = props.sessionID
       ? props.sessionID
       : await (async () => {
-          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-          return sessionID
-        })()
+        const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
+        return sessionID
+      })()
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
 
@@ -577,8 +577,8 @@ export function Prompt(props: PromptProps) {
                 autocomplete.onInput(value)
                 syncExtmarksWithPromptParts()
               }}
-              keyBindings={textareaKeybindings()}
-              onKeyDown={async (e: KeyEvent) => {
+              keyBindings={textareaKeybindings() as any}
+              onKeyDown={async (e: any) => {
                 if (props.disabled) {
                   e.preventDefault()
                   return
@@ -684,7 +684,7 @@ export function Prompt(props: PromptProps) {
                 }
               }}
               onSubmit={submit}
-              onPaste={async (event: PasteEvent) => {
+              onPaste={async (event: any) => {
                 if (props.disabled) {
                   event.preventDefault()
                   return
@@ -717,7 +717,7 @@ export function Prompt(props: PromptProps) {
                       return
                     }
                   }
-                } catch {}
+                } catch { }
 
                 const lineCount = (pastedContent.match(/\n/g)?.length ?? 0) + 1
                 if (lineCount >= 5 && !sync.data.config.experimental?.disable_paste_summary) {
@@ -760,8 +760,8 @@ export function Prompt(props: PromptProps) {
                   return
                 }
               }}
-              ref={(r: TextareaRenderable) => (input = r)}
-              onMouseDown={(r: MouseEvent) => r.target?.focus()}
+              ref={(r: any) => (input = r)}
+              onMouseDown={(r: any) => r.target?.focus()}
               focusedBackgroundColor={theme.backgroundElement}
               cursorColor={theme.primary}
               syntaxStyle={syntax()}
