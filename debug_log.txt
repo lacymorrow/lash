@@ -1,0 +1,69 @@
+$ bun run ./src/index.ts --print-logs
+INFO  2026-01-05T05:37:09 +1214ms service=default version=local args=["--print-logs"] opencode
+INFO  2026-01-05T05:37:09 +1ms service=default directory=/Users/lacy/repo/lash/packages/lash-cli creating instance
+INFO  2026-01-05T05:37:09 +1ms service=project directory=/Users/lacy/repo/lash/packages/lash-cli fromDirectory
+INFO  2026-01-05T05:37:09 +37ms service=default directory=/Users/lacy/repo/lash/packages/lash-cli bootstrapping
+INFO  2026-01-05T05:37:09 +4ms service=config path=/Users/lacy/.config/opencode/config.json loading
+INFO  2026-01-05T05:37:09 +1ms service=config path=/Users/lacy/.config/opencode/opencode.json loading
+INFO  2026-01-05T05:37:09 +0ms service=config path=/Users/lacy/.config/opencode/opencode.jsonc loading
+INFO  2026-01-05T05:37:09 +2ms service=bun cmd=["/opt/homebrew/Cellar/bun/1.2.19/bin/bun","add","@opencode-ai/plugin@latest","--exact"] cwd=/Users/lacy/.config/opencode running
+DEBUG 2026-01-05T05:37:09 +4ms service=config loading config from /Users/lacy/repo/lash/.opencode/opencode.jsonc
+INFO  2026-01-05T05:37:09 +0ms service=config path=/Users/lacy/repo/lash/.opencode/opencode.jsonc loading
+DEBUG 2026-01-05T05:37:09 +6ms service=config loading config from /Users/lacy/repo/lash/.opencode/opencode.json
+INFO  2026-01-05T05:37:09 +0ms service=config path=/Users/lacy/repo/lash/.opencode/opencode.json loading
+INFO  2026-01-05T05:37:09 +1ms service=bun cmd=["/opt/homebrew/Cellar/bun/1.2.19/bin/bun","add","@opencode-ai/plugin@latest","--exact"] cwd=/Users/lacy/repo/lash/.opencode running
+INFO  2026-01-05T05:37:09 +5ms service=bun code=0 stdout=bun add v1.3.5 (1e86cebd)
+
+installed @opencode-ai/plugin@1.1.1
+
+[5.00ms] done
+ stderr=Saved lockfile
+ done
+INFO  2026-01-05T05:37:09 +0ms service=bun cmd=["/opt/homebrew/Cellar/bun/1.2.19/bin/bun","install"] cwd=/Users/lacy/.config/opencode running
+INFO  2026-01-05T05:37:09 +9ms service=plugin path=opencode-copilot-auth@0.0.9 loading plugin
+INFO  2026-01-05T05:37:09 +5ms service=bun code=0 stdout=bun install v1.3.5 (1e86cebd)
+
+Checked 3 installs across 4 packages (no changes) [4.00ms]
+ stderr= done
+INFO  2026-01-05T05:37:09 +0ms service=plugin path=opencode-anthropic-auth@0.0.5 loading plugin
+INFO  2026-01-05T05:37:09 +0ms service=bun code=0 stdout=bun add v1.3.5 (1e86cebd)
+
+installed @opencode-ai/plugin@1.1.1
+
+[10.00ms] done
+ stderr=Saved lockfile
+ done
+INFO  2026-01-05T05:37:09 +0ms service=bun cmd=["/opt/homebrew/Cellar/bun/1.2.19/bin/bun","install"] cwd=/Users/lacy/repo/lash/.opencode running
+INFO  2026-01-05T05:37:09 +14ms service=bus type=* subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=session.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=message.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=message.part.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=session.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=message.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=message.part.updated subscribing
+INFO  2026-01-05T05:37:09 +0ms service=bus type=session.diff subscribing
+INFO  2026-01-05T05:37:09 +0ms service=format init
+INFO  2026-01-05T05:37:09 +0ms service=bus type=file.edited subscribing
+INFO  2026-01-05T05:37:09 +0ms service=lsp serverIds=deno, typescript, vue, eslint, oxlint, biome, gopls, ruby-lsp, pyright, elixir-ls, zls, csharp, fsharp, sourcekit-lsp, rust, clangd, svelte, astro, jdtls, kotlin-ls, yaml-ls, lua-ls, php intelephense, prisma, dart, ocaml-lsp, bash, terraform, texlab, dockerfile, gleam, clojure-lsp, nixd, tinymist, haskell-language-server enabled LSP servers
+INFO  2026-01-05T05:37:09 +1ms service=file.watcher init
+INFO  2026-01-05T05:37:09 +1ms service=bus type=command.executed subscribing
+INFO  2026-01-05T05:37:09 +1ms service=file.watcher platform=darwin backend=fs-events watcher backend
+INFO  2026-01-05T05:37:09 +3ms service=bun code=0 stdout=bun install v1.3.5 (1e86cebd)
+
+Checked 3 installs across 4 packages (no changes) [4.00ms]
+ stderr= done
+INFO  2026-01-05T05:37:09 +24ms service=vcs branch=refactor/separation initialized
+INFO  2026-01-05T05:37:09 +0ms service=bus type=file.watcher.updated subscribing
+]11;?[?25l[s[?1016$p[?2027$p[?2031$p[?1004$p[?2004$p[?2026$p[H]66;w=1; \[6n[H]66;s=2; \[6n[>0q[?u_Gi=1,a=q\[c[u[s[?1049h[?1000h[?1002h[?1003h[?1006h[14t[14t[?25l[1;1H[38;2;255;255;255m[49m                                                                                [2;1H[38;2;255;255;255m[49m                                                                                [3;1H[38;2;255;255;255m[49m                                                                                [4;1H[38;2;255;255;255m[49m                                                                                [5;1H[38;2;255;255;255m[49m                                                                                [6;1H[38;2;255;255;255m[49m                                                                                [7;1H[38;2;255;255;255m[49m                                                                                [8;1H[38;2;255;255;255m[49m                                                                                [9;1H[38;2;255;255;255m[49m                                                                                [10;1H[38;2;255;255;255m[49m                                                                                [11;1H[38;2;255;255;255m[49m                                                                                [12;1H[38;2;255;255;255m[49m                                                                                [13;1H[38;2;255;255;255m[49m                                                                                [14;1H[38;2;255;255;255m[49m                                                                                [15;1H[38;2;255;255;255m[49m                                                                                [16;1H[38;2;255;255;255m[49m                                                                                [17;1H[38;2;255;255;255m[49m                                                                                [18;1H[38;2;255;255;255m[49m                                                                                [19;1H[38;2;255;255;255m[49m                                                                                [20;1H[38;2;255;255;255m[49m                                                                                [21;1H[38;2;255;255;255m[49m                                                                                [22;1H[38;2;255;255;255m[49m                                                                                [23;1H[38;2;255;255;255m[49m                                                                                [24;1H[38;2;255;255;255m[49m                                                                                [0m[?25lINFO  2026-01-05T05:39:38 +149731ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:41:04 +85383ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:41:47 +43493ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:43:39 +112109ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:23 +523773ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:49 +25985ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:49 +234ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:50 +180ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:50 +0ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:50 +0ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:50 +6ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:50 +1ms service=bus type=file.watcher.updated publishing
+INFO  2026-01-05T05:52:54 +4912ms service=bus type=file.watcher.updated publishing
