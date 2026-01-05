@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+# lash-cli binary wrapper
+# Resolves to real path and runs src/index.ts via bun
+
+if ! command -v bun >/dev/null 2>&1; then
+    echo "Error: Bun is required." >&2
+    exit 1
+fi
+
+if [ -L "$0" ]; then
+    REAL_SCRIPT="$(readlink "$0")"
+    if [ "${REAL_SCRIPT#/}" = "$REAL_SCRIPT" ]; then
+        REAL_DIR="$(dirname "$0")"
+        REAL_SCRIPT="$REAL_DIR/$REAL_SCRIPT"
+    fi
+else
+    REAL_SCRIPT="$0"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
+PKG_ROOT="$(dirname "$SCRIPT_DIR")"
+
+exec bun run "$PKG_ROOT/src/index.ts" "$@"

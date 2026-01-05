@@ -1,0 +1,18 @@
+{
+    "extends": "@tsconfig/bun/tsconfig.json",
+    "compilerOptions": {
+        "strict": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/shell/*": [
+                "./src/shell/*"
+            ],
+            "@tui/*": [
+                "./src/tui/*"
+            ],
+            "@/*": [
+                "../opencode/src/*"
+            ]
+        }
+    }
+}

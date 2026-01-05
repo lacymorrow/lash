@@ -1,61 +1,44 @@
 #!/bin/sh
 set -e
 
-if [ -n "$OPENCODE_BIN_PATH" ]; then
-    resolved="$OPENCODE_BIN_PATH"
-else
-    # Get the real path of this script, resolving any symlinks
-    script_path="$0"
-    while [ -L "$script_path" ]; do
-        link_target="$(readlink "$script_path")"
-        case "$link_target" in
-            /*) script_path="$link_target" ;;
-            *) script_path="$(dirname "$script_path")/$link_target" ;;
-        esac
-    done
-    script_dir="$(dirname "$script_path")"
-    script_dir="$(cd "$script_dir" && pwd)"
-    
-    # Map platform names
-    case "$(uname -s)" in
-        Darwin) platform="darwin" ;;
-        Linux) platform="linux" ;;
-        MINGW*|CYGWIN*|MSYS*) platform="win32" ;;
-        *) platform="$(uname -s | tr '[:upper:]' '[:lower:]')" ;;
-    esac
-    
-    # Map architecture names  
-    case "$(uname -m)" in
-        x86_64|amd64) arch="x64" ;;
-        aarch64) arch="arm64" ;;
-        armv7l) arch="arm" ;;
-        *) arch="$(uname -m)" ;;
-    esac
-    
-    name="opencode-${platform}-${arch}"
-    binary="opencode"
-    [ "$platform" = "win32" ] && binary="opencode.exe"
-    
-    # Search for the binary starting from real script location
-    resolved=""
-    current_dir="$script_dir"
-    while [ "$current_dir" != "/" ]; do
-        candidate="$current_dir/node_modules/$name/bin/$binary"
-        if [ -f "$candidate" ]; then
-            resolved="$candidate"
-            break
-        fi
-        current_dir="$(dirname "$current_dir")"
-    done
-    
-    if [ -z "$resolved" ]; then
-        printf "It seems that your package manager failed to install the right version of the opencode CLI for your platform. You can try manually installing the \"%s\" package\n" "$name" >&2
-        exit 1
-    fi
+# This is the npm entry point for lash-cli
+# It requires Bun to be installed
+
+# Check if Bun is available
+if ! command -v bun >/dev/null 2>&1; then
+    echo "Error: Bun is required to run lash-cli" >&2
+    echo "" >&2
+    echo "Please install Bun first:" >&2
+    echo "  curl -fsSL https://bun.sh/install | bash" >&2
+    echo "" >&2
+    echo "Or on macOS with Homebrew:" >&2
+    echo "  brew install oven-sh/bun/bun" >&2
+    exit 1
 fi
 
-# Handle SIGINT gracefully
-trap '' INT
+# Find the real location of this script
+if [ -L "$0" ]; then
+    # It's a symlink, find the real file
+    REAL_SCRIPT="$(readlink "$0")"
+    if [ "${REAL_SCRIPT#/}" = "$REAL_SCRIPT" ]; then
+        # Relative path, resolve from symlink directory
+        REAL_DIR="$(dirname "$0")"
+        REAL_SCRIPT="$REAL_DIR/$REAL_SCRIPT"
+    fi
+else
+    REAL_SCRIPT="$0"
+fi
 
-# Execute the binary with all arguments
-exec "$resolved" "$@"
+# Get the package root directory
+SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
+PKG_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Check if we're in development (local) or production (npm installed)
+if [ -f "$PKG_ROOT/src/index.ts" ]; then
+    # Run with Bun using the TypeScript source
+    exec bun run "$PKG_ROOT/src/index.ts" "$@"
+else
+    echo "Error: Could not find src/index.ts in $PKG_ROOT" >&2
+    echo "Package may be incorrectly installed." >&2
+    exit 1
+fi

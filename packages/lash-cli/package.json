@@ -1,0 +1,20 @@
+{
+    "name": "lash-cli",
+    "version": "1.0.8",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "opencode": "workspace:*",
+        "yargs": "18.0.0"
+    },
+    "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:"
+    },
+    "bin": {
+        "lash": "./bin/lash"
+    },
+    "scripts": {
+        "dev": "bun run ./src/index.ts"
+    }
+}
