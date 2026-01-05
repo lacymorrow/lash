@@ -1,6 +1,6 @@
 import "./index.css"
 import { Title, Meta, Link } from "@solidjs/meta"
-import { HttpHeader } from "@solidjs/start"
+//import { HttpHeader } from "@solidjs/start"
 import video from "../asset/lander/opencode-min.mp4"
 import videoPoster from "../asset/lander/opencode-poster.png"
 import { IconCopy, IconCheck } from "../component/icon"
@@ -42,12 +42,9 @@ export default function Home() {
 
   return (
     <main data-page="opencode">
-      <HttpHeader
-        name="Cache-Control"
-        value="public, max-age=1, s-maxage=3600, stale-while-revalidate=86400"
-      />
-      <Title>OpenCode | The AI coding agent built for the terminal</Title>
-      <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      {/*<HttpHeader name="Cache-Control" value="public, max-age=1, s-maxage=3600, stale-while-revalidate=86400" />*/}
+      <Title>OpenCode | The open source AI coding agent</Title>
+      <Link rel="canonical" href={config.baseUrl} />
       <Meta property="og:image" content="/social-share.png" />
       <Meta name="twitter:image" content="/social-share.png" />
       <div data-component="container">
@@ -55,36 +52,32 @@ export default function Home() {
 
         <div data-component="content">
           <section data-component="hero">
+            <div data-component="desktop-app-banner">
+              <span data-slot="badge">New</span>
+              <div data-slot="content">
+                <span data-slot="text">
+                  Desktop app available in beta<span data-slot="platforms"> on macOS, Windows, and Linux</span>.
+                </span>
+                <a href="/download" data-slot="link">
+                  Download now
+                </a>
+                <a href="/download" data-slot="link-mobile">
+                  Download the desktop beta now
+                </a>
+              </div>
+            </div>
+
             <div data-slot="hero-copy">
-              <a
-                data-slot="releases"
-                href={release()?.url ?? `${config.github.repoUrl}/releases`}
-                target="_blank"
-              >
-                What’s new in {release()?.name ?? "the latest release"}
-              </a>
-              <strong>The AI coding agent built for the terminal</strong>
+              {/*<a data-slot="releases"*/}
+              {/*   href={release()?.url ?? `${config.github.repoUrl}/releases`}*/}
+              {/*   target="_blank">*/}
+              {/*  What’s new in {release()?.name ?? "the latest release"}*/}
+              {/*</a>*/}
+              <h1>The open source AI coding agent</h1>
               <p>
-                OpenCode is fully open source, giving you control and freedom to use any provider,
-                any model, and any editor.
+                Free models included or connect any model from any provider, <span data-slot="br"></span>including
+                Claude, GPT, Gemini and more.
               </p>
-              <a href="/docs">
-                <span>Read docs </span>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M6.5 12L17 12M13 16.5L17.5 12L13 7.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="square"
-                  />
-                </svg>
-              </a>
             </div>
             <div data-slot="installation">
               <Tabs
@@ -175,18 +168,9 @@ export default function Home() {
           <section data-component="what">
             <div data-slot="section-title">
               <h3>What is OpenCode?</h3>
-              <p>
-                OpenCode is an open source agent that helps you write and run code directly from the
-                terminal.
-              </p>
+              <p>OpenCode is an open source agent that helps you write code in your terminal, IDE, or desktop.</p>
             </div>
             <ul>
-              <li>
-                <span>[*]</span>
-                <div>
-                  <strong>Native TUI</strong> A responsive, native, themeable terminal UI
-                </div>
-              </li>
               <li>
                 <span>[*]</span>
                 <div>
@@ -196,8 +180,7 @@ export default function Home() {
               <li>
                 <span>[*]</span>
                 <div>
-                  <strong>Multi-session</strong> Start multiple agents in parallel on the same
-                  project
+                  <strong>Multi-session</strong> Start multiple agents in parallel on the same project
                 </div>
               </li>
               <li>
@@ -209,24 +192,33 @@ export default function Home() {
               <li>
                 <span>[*]</span>
                 <div>
-                  <strong>Claude Pro</strong> Log in with Anthropic to use your Claude Pro or Max
-                  account
+                  <strong>Claude Pro</strong> Log in with Anthropic to use your Claude Pro or Max account
                 </div>
               </li>
               <li>
                 <span>[*]</span>
                 <div>
-                  <strong>Any model</strong> 75+ LLM providers through Models.dev, including local
-                  models
+                  <strong>Any model</strong> 75+ LLM providers through Models.dev, including local models
                 </div>
               </li>
               <li>
                 <span>[*]</span>
                 <div>
-                  <strong>Any editor</strong> OpenCode runs in your terminal, pair it with any IDE
+                  <strong>Any editor</strong> Available as a terminal interface, desktop app, and IDE extension
                 </div>
               </li>
             </ul>
+            <a href="/docs">
+              <span>Read docs </span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M6.5 12L17 12M13 16.5L17.5 12L13 7.5"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="square"
+                />
+              </svg>
+            </a>
           </section>
 
           <section data-component="growth">
@@ -236,22 +228,16 @@ export default function Home() {
                 <span>[*]</span>
                 <p>
                   With over <strong>{config.github.starsFormatted.full}</strong> GitHub stars,{" "}
-                  <strong>{config.stats.contributors}</strong> contributors, and almost{" "}
-                  <strong>{config.stats.commits}</strong> commits, OpenCode is used and trusted by
-                  over <strong>{config.stats.monthlyUsers}</strong> developers every month.
+                  <strong>{config.stats.contributors}</strong> contributors, and over{" "}
+                  <strong>{config.stats.commits}</strong> commits, OpenCode is used and trusted by over{" "}
+                  <strong>{config.stats.monthlyUsers}</strong> developers every month.
                 </p>
               </div>
 
               <div data-component="growth-stats">
                 <div data-component="growth-stat">
                   <div data-component="stat-illustration">
-                    <svg
-                      width="205"
-                      height="264"
-                      viewBox="0 0 205 264"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
+                    <svg width="205" height="264" viewBox="0 0 205 264" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <g opacity="0.5" clip-path="url(#clip0_236_15902)">
                         <mask
                           id="mask0_236_15902"
@@ -297,20 +283,13 @@ export default function Home() {
                     </svg>
                   </div>
                   <span>
-                    <figure>Fig 1.</figure> <strong>{config.github.starsFormatted.compact}</strong>{" "}
-                    GitHub Stars
+                    <figure>Fig 1.</figure> <strong>{config.github.starsFormatted.compact}</strong> GitHub Stars
                   </span>
                 </div>
 
                 <div data-component="growth-stat">
                   <div data-component="stat-illustration">
-                    <svg
-                      width="205"
-                      height="264"
-                      viewBox="0 0 205 264"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
+                    <svg width="205" height="264" viewBox="0 0 205 264" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <g opacity="0.5" clip-path="url(#clip0_236_15557)">
                         <g clip-path="url(#clip1_236_15557)">
                           <rect opacity="0.81" width="6" height="6" fill="#CFCECD" />
@@ -439,54 +418,12 @@ export default function Home() {
                           <rect opacity="0.32" x="70" y="112" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.52" x="84" y="112" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.02" x="98" y="112" width="6" height="6" fill="#CFCECD" />
-                          <rect
-                            opacity="0.88"
-                            x="126"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.12"
-                            x="140"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.93"
-                            x="154"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.79"
-                            x="168"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.24"
-                            x="182"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.64"
-                            x="196"
-                            y="112"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
+                          <rect opacity="0.88" x="126" y="112" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.12" x="140" y="112" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.93" x="154" y="112" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.79" x="168" y="112" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.24" x="182" y="112" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.64" x="196" y="112" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.57" y="126" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.6" x="14" y="126" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.05" x="28" y="126" width="6" height="6" fill="#BCBBBB" />
@@ -495,55 +432,13 @@ export default function Home() {
                           <rect opacity="0.93" x="70" y="126" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.63" x="84" y="126" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.58" x="98" y="126" width="6" height="6" fill="#DAD9D9" />
-                          <rect
-                            opacity="0.64"
-                            x="112"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.74"
-                            x="126"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.74"
-                            x="140"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.64" x="112" y="126" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.74" x="126" y="126" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.74" x="140" y="126" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.1" x="154" y="126" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.93"
-                            x="168"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.43"
-                            x="182"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.45"
-                            x="196"
-                            y="126"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
+                          <rect opacity="0.93" x="168" y="126" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.43" x="182" y="126" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.45" x="196" y="126" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.77" y="140" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.78" x="14" y="140" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.18" x="28" y="140" width="6" height="6" fill="#DAD9D9" />
@@ -552,55 +447,13 @@ export default function Home() {
                           <rect opacity="0.53" x="70" y="140" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.06" x="84" y="140" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.81" x="98" y="140" width="6" height="6" fill="#DAD9D9" />
-                          <rect
-                            opacity="0.49"
-                            x="112"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.45"
-                            x="126"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.37"
-                            x="140"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.58"
-                            x="154"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.49" x="112" y="140" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.45" x="126" y="140" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.37" x="140" y="140" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.58" x="154" y="140" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.8" x="168" y="140" width="6" height="6" fill="#BCBBBB" />
-                          <rect
-                            opacity="0.35"
-                            x="182"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.73"
-                            x="196"
-                            y="140"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.35" x="182" y="140" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.73" x="196" y="140" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.92" y="154" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.32" x="14" y="154" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.3" x="28" y="154" width="6" height="6" fill="#8E8B8B" />
@@ -609,47 +462,12 @@ export default function Home() {
                           <rect opacity="0.66" x="70" y="154" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.83" x="84" y="154" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.52" x="98" y="154" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.82"
-                            x="112"
-                            y="154"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.95"
-                            x="126"
-                            y="154"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.89"
-                            x="140"
-                            y="154"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
+                          <rect opacity="0.82" x="112" y="154" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.95" x="126" y="154" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.89" x="140" y="154" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.2" x="154" y="154" width="6" height="6" fill="#BCBBBB" />
-                          <rect
-                            opacity="0.61"
-                            x="168"
-                            y="154"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.34"
-                            x="196"
-                            y="154"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
+                          <rect opacity="0.61" x="168" y="154" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.34" x="196" y="154" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.9" y="168" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.99" x="14" y="168" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.49" x="28" y="168" width="6" height="6" fill="#BCBBBB" />
@@ -658,55 +476,13 @@ export default function Home() {
                           <rect opacity="0.92" x="70" y="168" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.79" x="84" y="168" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.8" x="98" y="168" width="6" height="6" fill="#BCBBBB" />
-                          <rect
-                            opacity="0.74"
-                            x="112"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.38"
-                            x="126"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.56"
-                            x="140"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
+                          <rect opacity="0.74" x="112" y="168" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.38" x="126" y="168" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.56" x="140" y="168" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.7" x="154" y="168" width="6" height="6" fill="#DAD9D9" />
-                          <rect
-                            opacity="0.47"
-                            x="168"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.92"
-                            x="182"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.19"
-                            x="196"
-                            y="168"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
+                          <rect opacity="0.47" x="168" y="168" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.92" x="182" y="168" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.19" x="196" y="168" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.12" y="182" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.16" x="14" y="182" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.98" x="28" y="182" width="6" height="6" fill="#8E8B8B" />
@@ -715,55 +491,13 @@ export default function Home() {
                           <rect opacity="0.17" x="70" y="182" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.26" x="84" y="182" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.3" x="98" y="182" width="6" height="6" fill="#DAD9D9" />
-                          <rect
-                            opacity="0.12"
-                            x="112"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.31"
-                            x="126"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.62"
-                            x="140"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.74"
-                            x="154"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
+                          <rect opacity="0.12" x="112" y="182" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.31" x="126" y="182" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.62" x="140" y="182" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.74" x="154" y="182" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.8" x="168" y="182" width="6" height="6" fill="#CFCECD" />
-                          <rect
-                            opacity="0.89"
-                            x="182"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.75"
-                            x="196"
-                            y="182"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
+                          <rect opacity="0.89" x="182" y="182" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.75" x="196" y="182" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.1" y="196" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.11" x="14" y="196" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.79" x="28" y="196" width="6" height="6" fill="#BCBBBB" />
@@ -772,62 +506,13 @@ export default function Home() {
                           <rect opacity="0.31" x="70" y="196" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.33" x="84" y="196" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.2" x="98" y="196" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.21"
-                            x="112"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.02"
-                            x="126"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.82"
-                            x="140"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.28"
-                            x="154"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.19"
-                            x="168"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.97"
-                            x="182"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.45"
-                            x="196"
-                            y="196"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
+                          <rect opacity="0.21" x="112" y="196" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.02" x="126" y="196" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.82" x="140" y="196" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.28" x="154" y="196" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.19" x="168" y="196" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.97" x="182" y="196" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.45" x="196" y="196" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.88" y="210" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.58" x="14" y="210" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.53" x="28" y="210" width="6" height="6" fill="#BCBBBB" />
@@ -836,55 +521,13 @@ export default function Home() {
                           <rect opacity="0.73" x="70" y="210" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.87" x="84" y="210" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.35" x="98" y="210" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.61"
-                            x="112"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.61" x="112" y="210" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.8" x="126" y="210" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.87"
-                            x="140"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.77"
-                            x="154"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.94"
-                            x="168"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.59"
-                            x="182"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.37"
-                            x="196"
-                            y="210"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.87" x="140" y="210" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.77" x="154" y="210" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.94" x="168" y="210" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.59" x="182" y="210" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.37" x="196" y="210" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.7" y="224" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.72" x="14" y="224" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.95" x="28" y="224" width="6" height="6" fill="#CFCECD" />
@@ -894,54 +537,12 @@ export default function Home() {
                           <rect opacity="0.2" x="84" y="224" width="6" height="6" fill="#BCBBBB" />
                           <rect opacity="0.63" x="98" y="224" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.5" x="112" y="224" width="6" height="6" fill="#8E8B8B" />
-                          <rect
-                            opacity="0.79"
-                            x="126"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.02"
-                            x="140"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.17"
-                            x="154"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.99"
-                            x="168"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.82"
-                            x="182"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.28"
-                            x="196"
-                            y="224"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
+                          <rect opacity="0.79" x="126" y="224" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.02" x="140" y="224" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.17" x="154" y="224" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.99" x="168" y="224" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.82" x="182" y="224" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.28" x="196" y="224" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.76" y="238" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.39" x="14" y="238" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.14" x="28" y="238" width="6" height="6" fill="#8E8B8B" />
@@ -950,62 +551,13 @@ export default function Home() {
                           <rect opacity="0.13" x="70" y="238" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.35" x="84" y="238" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.13" x="98" y="238" width="6" height="6" fill="#BCBBBB" />
-                          <rect
-                            opacity="0.55"
-                            x="112"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.83"
-                            x="126"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.86"
-                            x="140"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.63"
-                            x="154"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.38"
-                            x="168"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.57"
-                            x="182"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.13"
-                            x="196"
-                            y="238"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.55" x="112" y="238" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.83" x="126" y="238" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.86" x="140" y="238" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.63" x="154" y="238" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.38" x="168" y="238" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.57" x="182" y="238" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.13" x="196" y="238" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.9" y="252" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.63" x="14" y="252" width="6" height="6" fill="#CFCECD" />
                           <rect opacity="0.23" x="28" y="252" width="6" height="6" fill="#8E8B8B" />
@@ -1014,54 +566,12 @@ export default function Home() {
                           <rect opacity="0.19" x="70" y="252" width="6" height="6" fill="#DAD9D9" />
                           <rect opacity="0.29" x="84" y="252" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.78" x="98" y="252" width="6" height="6" fill="#BCBBBB" />
-                          <rect
-                            opacity="0.14"
-                            x="112"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#BCBBBB"
-                          />
-                          <rect
-                            opacity="0.64"
-                            x="126"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
-                          <rect
-                            opacity="0.27"
-                            x="140"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#CFCECD"
-                          />
-                          <rect
-                            opacity="0.85"
-                            x="154"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.02"
-                            x="168"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#DAD9D9"
-                          />
-                          <rect
-                            opacity="0.29"
-                            x="182"
-                            y="252"
-                            width="6"
-                            height="6"
-                            fill="#8E8B8B"
-                          />
+                          <rect opacity="0.14" x="112" y="252" width="6" height="6" fill="#BCBBBB" />
+                          <rect opacity="0.64" x="126" y="252" width="6" height="6" fill="#8E8B8B" />
+                          <rect opacity="0.27" x="140" y="252" width="6" height="6" fill="#CFCECD" />
+                          <rect opacity="0.85" x="154" y="252" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.02" x="168" y="252" width="6" height="6" fill="#DAD9D9" />
+                          <rect opacity="0.29" x="182" y="252" width="6" height="6" fill="#8E8B8B" />
                           <rect opacity="0.4" x="196" y="252" width="6" height="6" fill="#8E8B8B" />
                         </g>
                       </g>
@@ -1070,31 +580,19 @@ export default function Home() {
                           <rect width="205" height="264" fill="white" />
                         </clipPath>
                         <clipPath id="clip1_236_15557">
-                          <rect
-                            width="236"
-                            height="264"
-                            fill="white"
-                            transform="translate(-0.164062)"
-                          />
+                          <rect width="236" height="264" fill="white" transform="translate(-0.164062)" />
                         </clipPath>
                       </defs>
                     </svg>
                   </div>
                   <span>
-                    <figure>Fig 2.</figure> <strong>{config.stats.contributors}</strong>{" "}
-                    Contributors
+                    <figure>Fig 2.</figure> <strong>{config.stats.contributors}</strong> Contributors
                   </span>
                 </div>
 
                 <div data-component="growth-stat">
                   <div data-component="stat-illustration">
-                    <svg
-                      width="205"
-                      height="264"
-                      viewBox="0 0 205 264"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
+                    <svg width="205" height="264" viewBox="0 0 205 264" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <g opacity="0.5">
                         <path d="M205 0H203.985V264H205V0Z" fill="#8E8B8B" />
                         <path d="M197.896 34H196.881V264H197.896V34Z" fill="#8E8B8B" />
@@ -1130,8 +628,7 @@ export default function Home() {
                     </svg>
                   </div>
                   <span>
-                    <figure>Fig 3.</figure> <strong>{config.stats.monthlyUsers}</strong> Monthly
-                    Devs
+                    <figure>Fig 3.</figure> <strong>{config.stats.monthlyUsers}</strong> Monthly Devs
                   </span>
                 </div>
               </div>
@@ -1145,9 +642,8 @@ export default function Home() {
                 <span>[*]</span>
 
                 <p>
-                  OpenCode does not store any of your code or context data, so that it can operate
-                  in privacy sensitive environments. Learn more about{" "}
-                  <a href="/docs/enterprise/ ">privacy</a>.
+                  OpenCode does not store any of your code or context data, so that it can operate in privacy sensitive
+                  environments. Learn more about <a href="/docs/enterprise/ ">privacy</a>.
                 </p>
               </div>
             </div>
@@ -1160,9 +656,8 @@ export default function Home() {
             <ul>
               <li>
                 <Faq question="What is OpenCode?">
-                  OpenCode is an open source agent that helps you write and run code directly from
-                  the terminal. You can pair OpenCode with any AI model, and because it’s
-                  terminal-based you can pair it with your preferred code editor.
+                  OpenCode is an open source agent that helps you write and run code with any AI model. It's available
+                  as a terminal-based interface, desktop app, or IDE extension.
                 </Faq>
               </li>
               <li>
@@ -1172,32 +667,39 @@ export default function Home() {
               </li>
               <li>
                 <Faq question="Do I need extra AI subscriptions to use OpenCode?">
-                  Not necessarily, but probably. You’ll need an AI subscription if you want to
-                  connect OpenCode to a paid provider, although you can work with{" "}
+                  Not necessarily, OpenCode comes with a set of free models that you can use without creating an
+                  account. Aside from these, you can use any of the popular coding models by creating a{" "}
+                  <A href="/zen">Zen</A> account. While we encourage users to use Zen, OpenCode also works with all
+                  popular providers such as OpenAI, Anthropic, xAI etc. You can even connect your{" "}
                   <a href="/docs/providers/#lm-studio" target="_blank">
                     local models
-                  </a>{" "}
-                  for free. While we encourage users to use <A href="/zen">Zen</A>, OpenCode works
-                  with all popular providers such as OpenAI, Anthropic, xAI etc.
+                  </a>
+                  .
+                </Faq>
+              </li>
+              <li>
+                <Faq question="Can I use my existing AI subscriptions with OpenCode?">
+                  Yes, OpenCode supports subscription plans from all major providers. You can use your Claude Pro/Max,
+                  ChatGPT Plus/Pro, or GitHub Copilot subscriptions. <a href="/docs/providers/#directory">Learn more</a>
+                  .
                 </Faq>
               </li>
               <li>
                 <Faq question="Can I only use OpenCode in the terminal?">
-                  Yes, for now. We are actively working on a desktop app. Join the waitlist for
-                  early access.
+                  Not anymore! OpenCode is now available as an app for your desktop.
                 </Faq>
               </li>
               <li>
                 <Faq question="How much does OpenCode cost?">
-                  OpenCode is 100% free to use. Any additional costs will come from your
-                  subscription to a model provider. While OpenCode works with any model provider, we
-                  recommend using <A href="/zen">Zen</A>.
+                  OpenCode is 100% free to use. It also comes with a set of free models. There might be additional costs
+                  if you connect any other provider.
                 </Faq>
               </li>
               <li>
                 <Faq question="What about data and privacy?">
-                  Your data and information is only stored when you create sharable links in
-                  OpenCode. Learn more about <a href="/docs/share/#privacy">share pages</a>.
+                  Your data and information is only stored when you use our free models or create sharable links. Learn
+                  more about <a href="/docs/zen/#privacy">our models</a> and{" "}
+                  <a href="/docs/share/#privacy">share pages</a>.
                 </Faq>
               </li>
               <li>
@@ -1210,8 +712,8 @@ export default function Home() {
                   <a href={`${config.github.repoUrl}?tab=MIT-1-ov-file#readme`} target="_blank">
                     MIT License
                   </a>
-                  , meaning anyone can use, modify, or contribute to its development. Anyone from
-                  the community can file issues, submit pull requests, and extend functionality.
+                  , meaning anyone can use, modify, or contribute to its development. Anyone from the community can file
+                  issues, submit pull requests, and extend functionality.
                 </Faq>
               </li>
             </ul>
@@ -1221,19 +723,13 @@ export default function Home() {
             <div data-slot="zen-cta-copy">
               <strong>Access reliable optimized models for coding agents</strong>
               <p>
-                Zen gives you access to a handpicked set of AI models that OpenCode has tested and
-                benchmarked specifically for coding agents. No need to worry about inconsistent
-                performance and quality across providers, use validated models that work.
+                Zen gives you access to a handpicked set of AI models that OpenCode has tested and benchmarked
+                specifically for coding agents. No need to worry about inconsistent performance and quality across
+                providers, use validated models that work.
               </p>
               <div data-slot="model-logos">
                 <div>
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <mask
                       id="mask0_79_128586"
                       style="mask-type:luminance"
@@ -1254,17 +750,8 @@ export default function Home() {
                   </svg>
                 </div>
                 <div>
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M13.7891 3.93164L20.2223 20.0677H23.7502L17.317 3.93164H13.7891Z"
-                      fill="currentColor"
-                    />
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13.7891 3.93164L20.2223 20.0677H23.7502L17.317 3.93164H13.7891Z" fill="currentColor" />
                     <path
                       d="M6.32538 13.6824L8.52662 8.01177L10.7279 13.6824H6.32538ZM6.68225 3.93164L0.25 20.0677H3.84652L5.16202 16.6791H11.8914L13.2067 20.0677H16.8033L10.371 3.93164H6.68225Z"
                       fill="currentColor"
@@ -1275,10 +762,15 @@ export default function Home() {
                   <svg
                     width="24"
                     height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
+                    viewBox="0 0 50 50"
+                    fill="currentColor"
                     xmlns="http://www.w3.org/2000/svg"
                   >
+                    <path d="M49.04,24.001l-1.082-0.043h-0.001C36.134,23.492,26.508,13.866,26.042,2.043L25.999,0.96C25.978,0.424,25.537,0,25,0	s-0.978,0.424-0.999,0.96l-0.043,1.083C23.492,13.866,13.866,23.492,2.042,23.958L0.96,24.001C0.424,24.022,0,24.463,0,25	c0,0.537,0.424,0.978,0.961,0.999l1.082,0.042c11.823,0.467,21.449,10.093,21.915,21.916l0.043,1.083C24.022,49.576,24.463,50,25,50	s0.978-0.424,0.999-0.96l0.043-1.083c0.466-11.823,10.092-21.449,21.915-21.916l1.082-0.042C49.576,25.978,50,25.537,50,25	C50,24.463,49.576,24.022,49.04,24.001z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                       d="M9.16861 16.0529L17.2018 9.85156C17.5957 9.54755 18.1586 9.66612 18.3463 10.1384C19.3339 12.6288 18.8926 15.6217 16.9276 17.6766C14.9626 19.7314 12.2285 20.1821 9.72948 19.1557L6.9995 20.4775C10.9151 23.2763 15.6699 22.5841 18.6411 19.4749C20.9979 17.0103 21.7278 13.6508 21.0453 10.6214L21.0515 10.6278C20.0617 6.17736 21.2948 4.39847 23.8207 0.760904C23.8804 0.674655 23.9402 0.588405 24 0.5L20.6762 3.97585V3.96506L9.16658 16.0551"
                       fill="currentColor"
@@ -1290,13 +782,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <div>
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                       fill-rule="evenodd"
                       clip-rule="evenodd"
@@ -1306,29 +792,25 @@ export default function Home() {
                   </svg>
                 </div>
                 <div>
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                       d="M12.6241 11.346L20.3848 3.44816C20.5309 3.29931 20.4487 3 20.2601 3H16.0842C16.0388 3 15.9949 3.01897 15.9594 3.05541L7.59764 11.5629C7.46721 11.6944 7.27446 11.5771 7.27446 11.3666V3.25183C7.27446 3.11242 7.18515 3 7.07594 3H4.19843C4.08932 3 4 3.11242 4 3.25183V20.7482C4 20.8876 4.08932 21 4.19843 21H7.07594C7.18515 21 7.27446 20.8876 7.27446 20.7482V17.1834C7.27446 17.1073 7.30136 17.0344 7.34815 16.987L9.94075 14.3486C10.0031 14.2853 10.0895 14.2757 10.159 14.3232L17.0934 19.5573C18.2289 20.3412 19.4975 20.8226 20.786 20.9652C20.9008 20.9778 21 20.8606 21 20.7133V17.3559C21 17.2276 20.9249 17.1232 20.8243 17.1073C20.0659 16.9853 19.326 16.6845 18.6569 16.222L12.6538 11.764C12.5291 11.6785 12.5135 11.4584 12.6241 11.346Z"
                       fill="currentColor"
                     />
                   </svg>
                 </div>
+                <div>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M12.0962 3L10.0998 5.6577H1.59858L3.59417 3H12.0972H12.0962ZM22.3162 18.3432L20.3215 21H11.8497L13.8425 18.3432H22.3162ZM23 3L9.492 21H1L14.508 3H23Z"
+                      fill="black"
+                    />
+                  </svg>
+                </div>
               </div>
               <A href="/zen">
                 <span>Learn about Zen </span>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M6.5 12L17 12M13 16.5L17.5 12L13 7.5"
                     stroke="currentColor"

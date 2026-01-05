@@ -1,44 +1,84 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env node
 
-# This is the npm entry point for lash-cli
-# It requires Bun to be installed
+const childProcess = require("child_process")
+const fs = require("fs")
+const path = require("path")
+const os = require("os")
 
-# Check if Bun is available
-if ! command -v bun >/dev/null 2>&1; then
-    echo "Error: Bun is required to run lash-cli" >&2
-    echo "" >&2
-    echo "Please install Bun first:" >&2
-    echo "  curl -fsSL https://bun.sh/install | bash" >&2
-    echo "" >&2
-    echo "Or on macOS with Homebrew:" >&2
-    echo "  brew install oven-sh/bun/bun" >&2
-    exit 1
-fi
+function run(target) {
+  const result = childProcess.spawnSync(target, process.argv.slice(2), {
+    stdio: "inherit",
+  })
+  if (result.error) {
+    console.error(result.error.message)
+    process.exit(1)
+  }
+  const code = typeof result.status === "number" ? result.status : 0
+  process.exit(code)
+}
 
-# Find the real location of this script
-if [ -L "$0" ]; then
-    # It's a symlink, find the real file
-    REAL_SCRIPT="$(readlink "$0")"
-    if [ "${REAL_SCRIPT#/}" = "$REAL_SCRIPT" ]; then
-        # Relative path, resolve from symlink directory
-        REAL_DIR="$(dirname "$0")"
-        REAL_SCRIPT="$REAL_DIR/$REAL_SCRIPT"
-    fi
-else
-    REAL_SCRIPT="$0"
-fi
+const envPath = process.env.OPENCODE_BIN_PATH
+if (envPath) {
+  run(envPath)
+}
 
-# Get the package root directory
-SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
-PKG_ROOT="$(dirname "$SCRIPT_DIR")"
+const scriptPath = fs.realpathSync(__filename)
+const scriptDir = path.dirname(scriptPath)
 
-# Check if we're in development (local) or production (npm installed)
-if [ -f "$PKG_ROOT/src/index.ts" ]; then
-    # Run with Bun using the TypeScript source
-    exec bun run "$PKG_ROOT/src/index.ts" "$@"
-else
-    echo "Error: Could not find src/index.ts in $PKG_ROOT" >&2
-    echo "Package may be incorrectly installed." >&2
-    exit 1
-fi
+const platformMap = {
+  darwin: "darwin",
+  linux: "linux",
+  win32: "windows",
+}
+const archMap = {
+  x64: "x64",
+  arm64: "arm64",
+  arm: "arm",
+}
+
+let platform = platformMap[os.platform()]
+if (!platform) {
+  platform = os.platform()
+}
+let arch = archMap[os.arch()]
+if (!arch) {
+  arch = os.arch()
+}
+const base = "opencode-" + platform + "-" + arch
+const binary = platform === "windows" ? "opencode.exe" : "opencode"
+
+function findBinary(startDir) {
+  let current = startDir
+  for (;;) {
+    const modules = path.join(current, "node_modules")
+    if (fs.existsSync(modules)) {
+      const entries = fs.readdirSync(modules)
+      for (const entry of entries) {
+        if (!entry.startsWith(base)) {
+          continue
+        }
+        const candidate = path.join(modules, entry, "bin", binary)
+        if (fs.existsSync(candidate)) {
+          return candidate
+        }
+      }
+    }
+    const parent = path.dirname(current)
+    if (parent === current) {
+      return
+    }
+    current = parent
+  }
+}
+
+const resolved = findBinary(scriptDir)
+if (!resolved) {
+  console.error(
+    'It seems that your package manager failed to install the right version of the opencode CLI for your platform. You can try manually installing the "' +
+      base +
+      '" package',
+  )
+  process.exit(1)
+}
+
+run(resolved)

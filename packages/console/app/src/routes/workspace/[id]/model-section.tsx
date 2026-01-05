@@ -8,6 +8,8 @@ import { querySessionInfo } from "../common"
 import {
   IconAlibaba,
   IconAnthropic,
+  IconGemini,
+  IconMiniMax,
   IconMoonshotAI,
   IconOpenAI,
   IconStealth,
@@ -18,9 +20,11 @@ import {
 const getModelLab = (modelId: string) => {
   if (modelId.startsWith("claude")) return "Anthropic"
   if (modelId.startsWith("gpt")) return "OpenAI"
+  if (modelId.startsWith("gemini")) return "Google"
   if (modelId.startsWith("kimi")) return "Moonshot AI"
   if (modelId.startsWith("glm")) return "Z.ai"
   if (modelId.startsWith("qwen")) return "Alibaba"
+  if (modelId.startsWith("minimax")) return "MiniMax"
   if (modelId.startsWith("grok")) return "xAI"
   return "Stealth"
 }
@@ -30,10 +34,23 @@ const getModelsInfo = query(async (workspaceID: string) => {
   return withActor(async () => {
     return {
       all: Object.entries(ZenData.list().models)
-        .filter(([id, _model]) => !["claude-3-5-haiku", "minimax-m2"].includes(id))
-        .filter(([id, _model]) => !id.startsWith("an-"))
-        .sort(([_idA, modelA], [_idB, modelB]) => modelA.name.localeCompare(modelB.name))
-        .map(([id, model]) => ({ id, name: model.name })),
+        .filter(([id, _model]) => !["claude-3-5-haiku"].includes(id))
+        .filter(([id, _model]) => !id.startsWith("alpha-"))
+        .sort(([idA, modelA], [idB, modelB]) => {
+          const priority = ["big-pickle", "minimax", "grok", "claude", "gpt", "gemini"]
+          const getPriority = (id: string) => {
+            const index = priority.findIndex((p) => id.startsWith(p))
+            return index === -1 ? Infinity : index
+          }
+          const pA = getPriority(idA)
+          const pB = getPriority(idB)
+          if (pA !== pB) return pA - pB
+
+          const modelAName = Array.isArray(modelA) ? modelA[0].name : modelA.name
+          const modelBName = Array.isArray(modelB) ? modelB[0].name : modelB.name
+          return modelAName.localeCompare(modelBName)
+        })
+        .map(([id, model]) => ({ id, name: Array.isArray(model) ? model[0].name : model.name })),
       disabled: await Model.listDisabled(),
     }
   }, workspaceID)
@@ -76,8 +93,7 @@ export function ModelSection() {
       <div data-slot="section-title">
         <h2>Models</h2>
         <p>
-          Manage which models workspace members can access.{" "}
-          <a href="/docs/zen#pricing ">Learn more</a>.
+          Manage which models workspace members can access. <a href="/docs/zen#pricing ">Learn more</a>.
         </p>
       </div>
       <div data-slot="models-list">
@@ -105,6 +121,8 @@ export function ModelSection() {
                                   return <IconOpenAI width={16} height={16} />
                                 case "Anthropic":
                                   return <IconAnthropic width={16} height={16} />
+                                case "Google":
+                                  return <IconGemini width={16} height={16} />
                                 case "Moonshot AI":
                                   return <IconMoonshotAI width={16} height={16} />
                                 case "Z.ai":
@@ -113,6 +131,8 @@ export function ModelSection() {
                                   return <IconAlibaba width={16} height={16} />
                                 case "xAI":
                                   return <IconXai width={16} height={16} />
+                                case "MiniMax":
+                                  return <IconMiniMax width={16} height={16} />
                                 default:
                                   return <IconStealth width={16} height={16} />
                               }

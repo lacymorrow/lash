@@ -6,11 +6,22 @@ node_modules
 .idea
 .vscode
 *~
-openapi.json
 playground
 tmp
 *.bun-build
 dist
+ts-dist
 .turbo
 **/.serena
 .serena/
+/result
+refs
+Session.vim
+opencode.json
+a.out
+target
+.scripts
+
+# Local dev files
+opencode-dev
+logs/

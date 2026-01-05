@@ -1,14 +1,13 @@
+import { BusEvent } from "@/bus/bus-event"
+import { Bus } from "@/bus"
 import { Decimal } from "decimal.js"
 import z from "zod"
 import { type LanguageModelUsage, type ProviderMetadata } from "ai"
-
-import { Bus } from "../bus"
 import { Config } from "../config/config"
 import { Flag } from "../flag/flag"
 import { Identifier } from "../id/id"
 import { Installation } from "../installation"
-import type { ModelsDev } from "../provider/models"
-import { Share } from "../share/share"
+
 import { Storage } from "../storage/storage"
 import { Log } from "../util/log"
 import { MessageV2 } from "./message-v2"
@@ -17,6 +16,9 @@ import { SessionPrompt } from "./prompt"
 import { fn } from "@/util/fn"
 import { Command } from "../command"
 import { Snapshot } from "@/snapshot"
+
+import type { Provider } from "@/provider/provider"
+import { PermissionNext } from "@/permission/next"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -44,6 +46,7 @@ export namespace Session {
         .object({
           additions: z.number(),
           deletions: z.number(),
+          files: z.number(),
           diffs: Snapshot.FileDiff.array().optional(),
         })
         .optional(),
@@ -58,7 +61,9 @@ export namespace Session {
         created: z.number(),
         updated: z.number(),
         compacting: z.number().optional(),
+        archived: z.number().optional(),
       }),
+      permission: PermissionNext.Ruleset.optional(),
       revert: z
         .object({
           messageID: z.string(),
@@ -84,25 +89,32 @@ export namespace Session {
   export type ShareInfo = z.output<typeof ShareInfo>
 
   export const Event = {
-    Created: Bus.event(
+    Created: BusEvent.define(
       "session.created",
       z.object({
         info: Info,
       }),
     ),
-    Updated: Bus.event(
+    Updated: BusEvent.define(
       "session.updated",
       z.object({
         info: Info,
       }),
     ),
-    Deleted: Bus.event(
+    Deleted: BusEvent.define(
       "session.deleted",
       z.object({
         info: Info,
       }),
     ),
-    Error: Bus.event(
+    Diff: BusEvent.define(
+      "session.diff",
+      z.object({
+        sessionID: z.string(),
+        diff: Snapshot.FileDiff.array(),
+      }),
+    ),
+    Error: BusEvent.define(
       "session.error",
       z.object({
         sessionID: z.string().optional(),
@@ -116,6 +128,7 @@ export namespace Session {
       .object({
         parentID: Identifier.schema("session").optional(),
         title: z.string().optional(),
+        permission: Info.shape.permission,
       })
       .optional(),
     async (input) => {
@@ -123,6 +136,7 @@ export namespace Session {
         parentID: input?.parentID,
         directory: Instance.directory,
         title: input?.title,
+        permission: input?.permission,
       })
     },
   )
@@ -136,7 +150,7 @@ export namespace Session {
       const session = await createNext({
         directory: Instance.directory,
       })
-      const msgs = await messages(input.sessionID)
+      const msgs = await messages({ sessionID: input.sessionID })
       for (const msg of msgs) {
         if (input.messageID && msg.info.id >= input.messageID) break
         const cloned = await updateMessage({
@@ -169,6 +183,7 @@ export namespace Session {
     title?: string
     parentID?: string
     directory: string
+    permission?: PermissionNext.Ruleset
   }) {
     const result: Info = {
       id: Identifier.descending("session", input.id),
@@ -177,6 +192,7 @@ export namespace Session {
       directory: input.directory,
       parentID: input.parentID,
       title: input.title ?? createDefaultTitle(!!input.parentID),
+      permission: input.permission,
       time: {
         created: Date.now(),
         updated: Date.now(),
@@ -218,34 +234,23 @@ export namespace Session {
     if (cfg.share === "disabled") {
       throw new Error("Sharing is disabled in configuration")
     }
-
-    const session = await get(id)
-    if (session.share) return session.share
-    const share = await Share.create(id)
+    const { ShareNext } = await import("@/share/share-next")
+    const share = await ShareNext.create(id)
     await update(id, (draft) => {
       draft.share = {
         url: share.url,
       }
     })
-    await Storage.write(["share", id], share)
-    await Share.sync("session/info/" + id, session)
-    for (const msg of await messages(id)) {
-      await Share.sync("session/message/" + id + "/" + msg.info.id, msg.info)
-      for (const part of msg.parts) {
-        await Share.sync("session/part/" + id + "/" + msg.info.id + "/" + part.id, part)
-      }
-    }
     return share
   })
 
   export const unshare = fn(Identifier.schema("session"), async (id) => {
-    const share = await getShare(id)
-    if (!share) return
-    await Storage.remove(["share", id])
+    // Use ShareNext to remove the share (same as share function uses ShareNext to create)
+    const { ShareNext } = await import("@/share/share-next")
+    await ShareNext.remove(id)
     await update(id, (draft) => {
       draft.share = undefined
     })
-    await Share.remove(id, share.secret)
   })
 
   export async function update(id: string, editor: (session: Info) => void) {
@@ -265,41 +270,21 @@ export namespace Session {
     return diffs ?? []
   })
 
-  export const messages = fn(Identifier.schema("session"), async (sessionID) => {
-    const result = [] as MessageV2.WithParts[]
-    for (const p of await Storage.list(["message", sessionID])) {
-      const read = await Storage.read<MessageV2.Info>(p)
-      result.push({
-        info: read,
-        parts: await getParts(read.id),
-      })
-    }
-    result.sort((a, b) => (a.info.id > b.info.id ? 1 : -1))
-    return result
-  })
-
-  export const getMessage = fn(
+  export const messages = fn(
     z.object({
       sessionID: Identifier.schema("session"),
-      messageID: Identifier.schema("message"),
+      limit: z.number().optional(),
     }),
     async (input) => {
-      return {
-        info: await Storage.read<MessageV2.Info>(["message", input.sessionID, input.messageID]),
-        parts: await getParts(input.messageID),
+      const result = [] as MessageV2.WithParts[]
+      for await (const msg of MessageV2.stream(input.sessionID)) {
+        if (input.limit && result.length >= input.limit) break
+        result.push(msg)
       }
+      result.reverse()
+      return result
     },
   )
-
-  export const getParts = fn(Identifier.schema("message"), async (messageID) => {
-    const result = [] as MessageV2.Part[]
-    for (const item of await Storage.list(["part", messageID])) {
-      const read = await Storage.read<MessageV2.Part>(item)
-      result.push(read)
-    }
-    result.sort((a, b) => (a.id > b.id ? 1 : -1))
-    return result
-  })
 
   export async function* list() {
     const project = Instance.project
@@ -365,6 +350,23 @@ export namespace Session {
     },
   )
 
+  export const removePart = fn(
+    z.object({
+      sessionID: Identifier.schema("session"),
+      messageID: Identifier.schema("message"),
+      partID: Identifier.schema("part"),
+    }),
+    async (input) => {
+      await Storage.remove(["part", input.messageID, input.partID])
+      Bus.publish(MessageV2.Event.PartRemoved, {
+        sessionID: input.sessionID,
+        messageID: input.messageID,
+        partID: input.partID,
+      })
+      return input.partID
+    },
+  )
+
   const UpdatePartInput = z.union([
     MessageV2.Part,
     z.object({
@@ -390,32 +392,52 @@ export namespace Session {
 
   export const getUsage = fn(
     z.object({
-      model: z.custom<ModelsDev.Model>(),
+      model: z.custom<Provider.Model>(),
       usage: z.custom<LanguageModelUsage>(),
       metadata: z.custom<ProviderMetadata>().optional(),
     }),
     (input) => {
+      const cachedInputTokens = input.usage.cachedInputTokens ?? 0
+      const excludesCachedTokens = !!(input.metadata?.["anthropic"] || input.metadata?.["bedrock"])
+      const adjustedInputTokens = excludesCachedTokens
+        ? (input.usage.inputTokens ?? 0)
+        : (input.usage.inputTokens ?? 0) - cachedInputTokens
+      const safe = (value: number) => {
+        if (!Number.isFinite(value)) return 0
+        return value
+      }
+
       const tokens = {
-        input: input.usage.inputTokens ?? 0,
-        output: input.usage.outputTokens ?? 0,
-        reasoning: input.usage?.reasoningTokens ?? 0,
+        input: safe(adjustedInputTokens),
+        output: safe(input.usage.outputTokens ?? 0),
+        reasoning: safe(input.usage?.reasoningTokens ?? 0),
         cache: {
-          write: (input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
-            // @ts-expect-error
-            input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
-            0) as number,
-          read: input.usage.cachedInputTokens ?? 0,
+          write: safe(
+            (input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
+              // @ts-expect-error
+              input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
+              0) as number,
+          ),
+          read: safe(cachedInputTokens),
         },
       }
+
+      const costInfo =
+        input.model.cost?.experimentalOver200K && tokens.input + tokens.cache.read > 200_000
+          ? input.model.cost.experimentalOver200K
+          : input.model.cost
       return {
-        cost: new Decimal(0)
-          .add(new Decimal(tokens.input).mul(input.model.cost?.input ?? 0).div(1_000_000))
-          .add(new Decimal(tokens.output).mul(input.model.cost?.output ?? 0).div(1_000_000))
-          .add(new Decimal(tokens.cache.read).mul(input.model.cost?.cache_read ?? 0).div(1_000_000))
-          .add(
-            new Decimal(tokens.cache.write).mul(input.model.cost?.cache_write ?? 0).div(1_000_000),
-          )
-          .toNumber(),
+        cost: safe(
+          new Decimal(0)
+            .add(new Decimal(tokens.input).mul(costInfo?.input ?? 0).div(1_000_000))
+            .add(new Decimal(tokens.output).mul(costInfo?.output ?? 0).div(1_000_000))
+            .add(new Decimal(tokens.cache.read).mul(costInfo?.cache?.read ?? 0).div(1_000_000))
+            .add(new Decimal(tokens.cache.write).mul(costInfo?.cache?.write ?? 0).div(1_000_000))
+            // TODO: update models.dev to have better pricing model, for now:
+            // charge reasoning tokens at the same rate as output tokens
+            .add(new Decimal(tokens.reasoning).mul(costInfo?.output ?? 0).div(1_000_000))
+            .toNumber(),
+        ),
         tokens,
       }
     },

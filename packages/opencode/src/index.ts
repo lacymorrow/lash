@@ -6,10 +6,11 @@ import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
+import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
 import { Installation } from "./installation"
-import { NamedError } from "./util/error"
+import { NamedError } from "@opencode-ai/util/error"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
@@ -17,6 +18,7 @@ import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
 import { ExportCommand } from "./cli/cmd/export"
+import { ImportCommand } from "./cli/cmd/import"
 import { AttachCommand } from "./cli/cmd/tui/attach"
 import { TuiThreadCommand } from "./cli/cmd/tui/thread"
 import { TuiSpawnCommand } from "./cli/cmd/tui/spawn"
@@ -24,10 +26,14 @@ import { AcpCommand } from "./cli/cmd/acp"
 import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
 import { fileURLToPath } from 'url'
+import { PrCommand } from "./cli/cmd/pr"
+import { SessionCommand } from "./cli/cmd/session"
 
 export const createCli = (args: string[] = process.argv, opts: { exclude?: string[] } = {}) => {
   const cli = yargs(hideBin(args))
+    .parserConfiguration({ "populate--": true })
     .scriptName("opencode")
+    .wrap(100)
     .help("help", "show help")
     .alias("help", "h")
     .version("version", "show version number", Installation.VERSION)
@@ -61,6 +67,7 @@ export const createCli = (args: string[] = process.argv, opts: { exclude?: strin
       })
     })
     .usage("\n" + UI.logo())
+    .completion("completion", "generate shell completion script")
     .command(AcpCommand)
     .command(McpCommand)
     // TUI Commands can be excluded
@@ -73,12 +80,16 @@ export const createCli = (args: string[] = process.argv, opts: { exclude?: strin
     .command(AuthCommand)
     .command(AgentCommand)
     .command(UpgradeCommand)
+    .command(UninstallCommand)
     .command(ServeCommand)
     .command(WebCommand)
     .command(ModelsCommand)
     .command(StatsCommand)
     .command(ExportCommand)
+    .command(ImportCommand)
     .command(GithubCommand)
+    .command(PrCommand)
+    .command(SessionCommand)
     .fail((msg, err, yargsInstance) => {
       if (
         msg.startsWith("Unknown argument") ||
@@ -128,34 +139,6 @@ export const run = async (args: string[] = process.argv) => {
         stack: e.stack,
       })
     }
-
-    // @ts-ignore
-    if (e && e.name === 'ResolveMessage' || (e.constructor && e.constructor.name === 'ResolveMessage')) {
-      // Best effort handle ResolveMessage if available globally or check by name
-      // The original code used `instanceof ResolveMessage` but we can't find the import.
-      // We'll trust that if it existed, TS would find it. If it was global, this is fine.
-      // However, since I can't be sure, I will assume it IS implied and try to use `instanceof` with a TS-ignore or similar if needed.
-      // But wait, if I put `if (e instanceof ResolveMessage)` here and TS complains, the build fails.
-      // I will use a dynamic check to be safe:
-      // NO, if strict mode is on, I can't use an undeclared var.
-      // Given I couldn't find it, I'll fallback to `any` cast if possible, or just skip it.
-      // Re-reading Step 54: Line 123 `if (e instanceof ResolveMessage) {`
-      // This implies it IS in scope. I will copy it exactly.
-    }
-
-    // Actually, I'll skip the ResolveMessage check for now to avoid compilation errors if I really did miss an import.
-    // If I broke it, I'll fix it. It seems to be related to Bun internals.
-    // Wait, let's look at Step 54 again. Was it there? Yes.
-    // I shall try to keep it.
-    /* 
-    if (e instanceof ResolveMessage) {
-       ...
-    }
-    */
-    // For now I will comment it out or try to include it.
-    // I'll try to find where it comes from one last time? No.
-    // I'll assume it's NOT there and the user's code relies on it being a global.
-    // I'll add `declare const ResolveMessage: any;` at top to satisfy TS if needed.
   } finally {
     process.exit()
   }

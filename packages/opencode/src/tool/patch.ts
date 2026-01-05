@@ -3,11 +3,9 @@ import * as path from "path"
 import * as fs from "fs/promises"
 import { Tool } from "./tool"
 import { FileTime } from "../file/time"
-import { Permission } from "../permission"
 import { Bus } from "../bus"
 import { FileWatcher } from "../file/watcher"
 import { Instance } from "../project/instance"
-import { Agent } from "../agent/agent"
 import { Patch } from "../patch"
 import { Filesystem } from "../util/filesystem"
 import { createTwoFilesPatch } from "diff"
@@ -39,7 +37,6 @@ export const PatchTool = Tool.define("patch", {
     }
 
     // Validate file paths and check permissions
-    const agent = await Agent.get(ctx.agent)
     const fileChanges: Array<{
       filePath: string
       oldContent: string
@@ -54,7 +51,16 @@ export const PatchTool = Tool.define("patch", {
       const filePath = path.resolve(Instance.directory, hunk.path)
 
       if (!Filesystem.contains(Instance.directory, filePath)) {
-        throw new Error(`File ${filePath} is not in the current working directory`)
+        const parentDir = path.dirname(filePath)
+        await ctx.ask({
+          permission: "external_directory",
+          patterns: [parentDir, path.join(parentDir, "*")],
+          always: [parentDir + "/*"],
+          metadata: {
+            filepath: filePath,
+            parentDir,
+          },
+        })
       }
 
       switch (hunk.type) {
@@ -127,18 +133,14 @@ export const PatchTool = Tool.define("patch", {
     }
 
     // Check permissions if needed
-    if (agent.permission.edit === "ask") {
-      await Permission.ask({
-        type: "edit",
-        sessionID: ctx.sessionID,
-        messageID: ctx.messageID,
-        callID: ctx.callID,
-        title: `Apply patch to ${fileChanges.length} files`,
-        metadata: {
-          diff: totalDiff,
-        },
-      })
-    }
+    await ctx.ask({
+      permission: "edit",
+      patterns: fileChanges.map((c) => path.relative(Instance.worktree, c.filePath)),
+      always: ["*"],
+      metadata: {
+        diff: totalDiff,
+      },
+    })
 
     // Apply the changes
     const changedFiles: string[] = []

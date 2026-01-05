@@ -2,10 +2,29 @@
 
 import type { Options as ClientOptions, TDataShape, Client } from "./client/index.js"
 import type {
+  GlobalEventData,
+  GlobalEventResponses,
   ProjectListData,
   ProjectListResponses,
   ProjectCurrentData,
   ProjectCurrentResponses,
+  PtyListData,
+  PtyListResponses,
+  PtyCreateData,
+  PtyCreateResponses,
+  PtyCreateErrors,
+  PtyRemoveData,
+  PtyRemoveResponses,
+  PtyRemoveErrors,
+  PtyGetData,
+  PtyGetResponses,
+  PtyGetErrors,
+  PtyUpdateData,
+  PtyUpdateResponses,
+  PtyUpdateErrors,
+  PtyConnectData,
+  PtyConnectResponses,
+  PtyConnectErrors,
   ConfigGetData,
   ConfigGetResponses,
   ConfigUpdateData,
@@ -17,13 +36,20 @@ import type {
   ToolListData,
   ToolListResponses,
   ToolListErrors,
+  InstanceDisposeData,
+  InstanceDisposeResponses,
   PathGetData,
   PathGetResponses,
+  VcsGetData,
+  VcsGetResponses,
   SessionListData,
   SessionListResponses,
   SessionCreateData,
   SessionCreateResponses,
   SessionCreateErrors,
+  SessionStatusData,
+  SessionStatusResponses,
+  SessionStatusErrors,
   SessionDeleteData,
   SessionDeleteResponses,
   SessionDeleteErrors,
@@ -68,6 +94,9 @@ import type {
   SessionMessageData,
   SessionMessageResponses,
   SessionMessageErrors,
+  SessionPromptAsyncData,
+  SessionPromptAsyncResponses,
+  SessionPromptAsyncErrors,
   SessionCommandData,
   SessionCommandResponses,
   SessionCommandErrors,
@@ -87,6 +116,16 @@ import type {
   CommandListResponses,
   ConfigProvidersData,
   ConfigProvidersResponses,
+  ProviderListData,
+  ProviderListResponses,
+  ProviderAuthData,
+  ProviderAuthResponses,
+  ProviderOauthAuthorizeData,
+  ProviderOauthAuthorizeResponses,
+  ProviderOauthAuthorizeErrors,
+  ProviderOauthCallbackData,
+  ProviderOauthCallbackResponses,
+  ProviderOauthCallbackErrors,
   FindTextData,
   FindTextResponses,
   FindFilesData,
@@ -106,6 +145,25 @@ import type {
   AppAgentsResponses,
   McpStatusData,
   McpStatusResponses,
+  McpAddData,
+  McpAddResponses,
+  McpAddErrors,
+  McpAuthRemoveData,
+  McpAuthRemoveResponses,
+  McpAuthRemoveErrors,
+  McpAuthStartData,
+  McpAuthStartResponses,
+  McpAuthStartErrors,
+  McpAuthCallbackData,
+  McpAuthCallbackResponses,
+  McpAuthCallbackErrors,
+  McpAuthAuthenticateData,
+  McpAuthAuthenticateResponses,
+  McpAuthAuthenticateErrors,
+  McpConnectData,
+  McpConnectResponses,
+  McpDisconnectData,
+  McpDisconnectResponses,
   LspStatusData,
   LspStatusResponses,
   FormatterStatusData,
@@ -145,10 +203,10 @@ import type {
 } from "./types.gen.js"
 import { client as _heyApiClient } from "./client.gen.js"
 
-export type Options<
-  TData extends TDataShape = TDataShape,
-  ThrowOnError extends boolean = boolean,
-> = ClientOptions<TData, ThrowOnError> & {
+export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = ClientOptions<
+  TData,
+  ThrowOnError
+> & {
   /**
    * You can provide a client instance returned by `createClient()` instead of
    * individual options. This might be also useful if you want to implement a
@@ -172,13 +230,23 @@ class _HeyApiClient {
   }
 }
 
+class Global extends _HeyApiClient {
+  /**
+   * Get events
+   */
+  public event<ThrowOnError extends boolean = false>(options?: Options<GlobalEventData, ThrowOnError>) {
+    return (options?.client ?? this._client).get.sse<GlobalEventResponses, unknown, ThrowOnError>({
+      url: "/global/event",
+      ...options,
+    })
+  }
+}
+
 class Project extends _HeyApiClient {
   /**
    * List all projects
    */
-  public list<ThrowOnError extends boolean = false>(
-    options?: Options<ProjectListData, ThrowOnError>,
-  ) {
+  public list<ThrowOnError extends boolean = false>(options?: Options<ProjectListData, ThrowOnError>) {
     return (options?.client ?? this._client).get<ProjectListResponses, unknown, ThrowOnError>({
       url: "/project",
       ...options,
@@ -188,11 +256,79 @@ class Project extends _HeyApiClient {
   /**
    * Get the current project
    */
-  public current<ThrowOnError extends boolean = false>(
-    options?: Options<ProjectCurrentData, ThrowOnError>,
-  ) {
+  public current<ThrowOnError extends boolean = false>(options?: Options<ProjectCurrentData, ThrowOnError>) {
     return (options?.client ?? this._client).get<ProjectCurrentResponses, unknown, ThrowOnError>({
       url: "/project/current",
+      ...options,
+    })
+  }
+}
+
+class Pty extends _HeyApiClient {
+  /**
+   * List all PTY sessions
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<PtyListData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<PtyListResponses, unknown, ThrowOnError>({
+      url: "/pty",
+      ...options,
+    })
+  }
+
+  /**
+   * Create a new PTY session
+   */
+  public create<ThrowOnError extends boolean = false>(options?: Options<PtyCreateData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<PtyCreateResponses, PtyCreateErrors, ThrowOnError>({
+      url: "/pty",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove a PTY session
+   */
+  public remove<ThrowOnError extends boolean = false>(options: Options<PtyRemoveData, ThrowOnError>) {
+    return (options.client ?? this._client).delete<PtyRemoveResponses, PtyRemoveErrors, ThrowOnError>({
+      url: "/pty/{id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Get PTY session info
+   */
+  public get<ThrowOnError extends boolean = false>(options: Options<PtyGetData, ThrowOnError>) {
+    return (options.client ?? this._client).get<PtyGetResponses, PtyGetErrors, ThrowOnError>({
+      url: "/pty/{id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Update PTY session
+   */
+  public update<ThrowOnError extends boolean = false>(options: Options<PtyUpdateData, ThrowOnError>) {
+    return (options.client ?? this._client).put<PtyUpdateResponses, PtyUpdateErrors, ThrowOnError>({
+      url: "/pty/{id}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * Connect to a PTY session
+   */
+  public connect<ThrowOnError extends boolean = false>(options: Options<PtyConnectData, ThrowOnError>) {
+    return (options.client ?? this._client).get<PtyConnectResponses, PtyConnectErrors, ThrowOnError>({
+      url: "/pty/{id}/connect",
       ...options,
     })
   }
@@ -212,14 +348,8 @@ class Config extends _HeyApiClient {
   /**
    * Update config
    */
-  public update<ThrowOnError extends boolean = false>(
-    options?: Options<ConfigUpdateData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).patch<
-      ConfigUpdateResponses,
-      ConfigUpdateErrors,
-      ThrowOnError
-    >({
+  public update<ThrowOnError extends boolean = false>(options?: Options<ConfigUpdateData, ThrowOnError>) {
+    return (options?.client ?? this._client).patch<ConfigUpdateResponses, ConfigUpdateErrors, ThrowOnError>({
       url: "/config",
       ...options,
       headers: {
@@ -232,9 +362,7 @@ class Config extends _HeyApiClient {
   /**
    * List all providers
    */
-  public providers<ThrowOnError extends boolean = false>(
-    options?: Options<ConfigProvidersData, ThrowOnError>,
-  ) {
+  public providers<ThrowOnError extends boolean = false>(options?: Options<ConfigProvidersData, ThrowOnError>) {
     return (options?.client ?? this._client).get<ConfigProvidersResponses, unknown, ThrowOnError>({
       url: "/config/providers",
       ...options,
@@ -264,6 +392,18 @@ class Tool extends _HeyApiClient {
   }
 }
 
+class Instance extends _HeyApiClient {
+  /**
+   * Dispose the current instance
+   */
+  public dispose<ThrowOnError extends boolean = false>(options?: Options<InstanceDisposeData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<InstanceDisposeResponses, unknown, ThrowOnError>({
+      url: "/instance/dispose",
+      ...options,
+    })
+  }
+}
+
 class Path extends _HeyApiClient {
   /**
    * Get the current path
@@ -276,13 +416,23 @@ class Path extends _HeyApiClient {
   }
 }
 
+class Vcs extends _HeyApiClient {
+  /**
+   * Get VCS info for the current instance
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<VcsGetData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<VcsGetResponses, unknown, ThrowOnError>({
+      url: "/vcs",
+      ...options,
+    })
+  }
+}
+
 class Session extends _HeyApiClient {
   /**
    * List all sessions
    */
-  public list<ThrowOnError extends boolean = false>(
-    options?: Options<SessionListData, ThrowOnError>,
-  ) {
+  public list<ThrowOnError extends boolean = false>(options?: Options<SessionListData, ThrowOnError>) {
     return (options?.client ?? this._client).get<SessionListResponses, unknown, ThrowOnError>({
       url: "/session",
       ...options,
@@ -292,14 +442,8 @@ class Session extends _HeyApiClient {
   /**
    * Create a new session
    */
-  public create<ThrowOnError extends boolean = false>(
-    options?: Options<SessionCreateData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<
-      SessionCreateResponses,
-      SessionCreateErrors,
-      ThrowOnError
-    >({
+  public create<ThrowOnError extends boolean = false>(options?: Options<SessionCreateData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<SessionCreateResponses, SessionCreateErrors, ThrowOnError>({
       url: "/session",
       ...options,
       headers: {
@@ -310,16 +454,20 @@ class Session extends _HeyApiClient {
   }
 
   /**
+   * Get session status
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<SessionStatusData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<SessionStatusResponses, SessionStatusErrors, ThrowOnError>({
+      url: "/session/status",
+      ...options,
+    })
+  }
+
+  /**
    * Delete a session and all its data
    */
-  public delete<ThrowOnError extends boolean = false>(
-    options: Options<SessionDeleteData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).delete<
-      SessionDeleteResponses,
-      SessionDeleteErrors,
-      ThrowOnError
-    >({
+  public delete<ThrowOnError extends boolean = false>(options: Options<SessionDeleteData, ThrowOnError>) {
+    return (options.client ?? this._client).delete<SessionDeleteResponses, SessionDeleteErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
     })
@@ -329,11 +477,7 @@ class Session extends _HeyApiClient {
    * Get session
    */
   public get<ThrowOnError extends boolean = false>(options: Options<SessionGetData, ThrowOnError>) {
-    return (options.client ?? this._client).get<
-      SessionGetResponses,
-      SessionGetErrors,
-      ThrowOnError
-    >({
+    return (options.client ?? this._client).get<SessionGetResponses, SessionGetErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
     })
@@ -342,14 +486,8 @@ class Session extends _HeyApiClient {
   /**
    * Update session properties
    */
-  public update<ThrowOnError extends boolean = false>(
-    options: Options<SessionUpdateData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).patch<
-      SessionUpdateResponses,
-      SessionUpdateErrors,
-      ThrowOnError
-    >({
+  public update<ThrowOnError extends boolean = false>(options: Options<SessionUpdateData, ThrowOnError>) {
+    return (options.client ?? this._client).patch<SessionUpdateResponses, SessionUpdateErrors, ThrowOnError>({
       url: "/session/{id}",
       ...options,
       headers: {
@@ -362,14 +500,8 @@ class Session extends _HeyApiClient {
   /**
    * Get a session's children
    */
-  public children<ThrowOnError extends boolean = false>(
-    options: Options<SessionChildrenData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).get<
-      SessionChildrenResponses,
-      SessionChildrenErrors,
-      ThrowOnError
-    >({
+  public children<ThrowOnError extends boolean = false>(options: Options<SessionChildrenData, ThrowOnError>) {
+    return (options.client ?? this._client).get<SessionChildrenResponses, SessionChildrenErrors, ThrowOnError>({
       url: "/session/{id}/children",
       ...options,
     })
@@ -378,14 +510,8 @@ class Session extends _HeyApiClient {
   /**
    * Get the todo list for a session
    */
-  public todo<ThrowOnError extends boolean = false>(
-    options: Options<SessionTodoData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).get<
-      SessionTodoResponses,
-      SessionTodoErrors,
-      ThrowOnError
-    >({
+  public todo<ThrowOnError extends boolean = false>(options: Options<SessionTodoData, ThrowOnError>) {
+    return (options.client ?? this._client).get<SessionTodoResponses, SessionTodoErrors, ThrowOnError>({
       url: "/session/{id}/todo",
       ...options,
     })
@@ -394,14 +520,8 @@ class Session extends _HeyApiClient {
   /**
    * Analyze the app and create an AGENTS.md file
    */
-  public init<ThrowOnError extends boolean = false>(
-    options: Options<SessionInitData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionInitResponses,
-      SessionInitErrors,
-      ThrowOnError
-    >({
+  public init<ThrowOnError extends boolean = false>(options: Options<SessionInitData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionInitResponses, SessionInitErrors, ThrowOnError>({
       url: "/session/{id}/init",
       ...options,
       headers: {
@@ -414,9 +534,7 @@ class Session extends _HeyApiClient {
   /**
    * Fork an existing session at a specific message
    */
-  public fork<ThrowOnError extends boolean = false>(
-    options: Options<SessionForkData, ThrowOnError>,
-  ) {
+  public fork<ThrowOnError extends boolean = false>(options: Options<SessionForkData, ThrowOnError>) {
     return (options.client ?? this._client).post<SessionForkResponses, unknown, ThrowOnError>({
       url: "/session/{id}/fork",
       ...options,
@@ -430,14 +548,8 @@ class Session extends _HeyApiClient {
   /**
    * Abort a session
    */
-  public abort<ThrowOnError extends boolean = false>(
-    options: Options<SessionAbortData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionAbortResponses,
-      SessionAbortErrors,
-      ThrowOnError
-    >({
+  public abort<ThrowOnError extends boolean = false>(options: Options<SessionAbortData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionAbortResponses, SessionAbortErrors, ThrowOnError>({
       url: "/session/{id}/abort",
       ...options,
     })
@@ -446,14 +558,8 @@ class Session extends _HeyApiClient {
   /**
    * Unshare the session
    */
-  public unshare<ThrowOnError extends boolean = false>(
-    options: Options<SessionUnshareData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).delete<
-      SessionUnshareResponses,
-      SessionUnshareErrors,
-      ThrowOnError
-    >({
+  public unshare<ThrowOnError extends boolean = false>(options: Options<SessionUnshareData, ThrowOnError>) {
+    return (options.client ?? this._client).delete<SessionUnshareResponses, SessionUnshareErrors, ThrowOnError>({
       url: "/session/{id}/share",
       ...options,
     })
@@ -462,14 +568,8 @@ class Session extends _HeyApiClient {
   /**
    * Share a session
    */
-  public share<ThrowOnError extends boolean = false>(
-    options: Options<SessionShareData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionShareResponses,
-      SessionShareErrors,
-      ThrowOnError
-    >({
+  public share<ThrowOnError extends boolean = false>(options: Options<SessionShareData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionShareResponses, SessionShareErrors, ThrowOnError>({
       url: "/session/{id}/share",
       ...options,
     })
@@ -478,14 +578,8 @@ class Session extends _HeyApiClient {
   /**
    * Get the diff for this session
    */
-  public diff<ThrowOnError extends boolean = false>(
-    options: Options<SessionDiffData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).get<
-      SessionDiffResponses,
-      SessionDiffErrors,
-      ThrowOnError
-    >({
+  public diff<ThrowOnError extends boolean = false>(options: Options<SessionDiffData, ThrowOnError>) {
+    return (options.client ?? this._client).get<SessionDiffResponses, SessionDiffErrors, ThrowOnError>({
       url: "/session/{id}/diff",
       ...options,
     })
@@ -494,14 +588,8 @@ class Session extends _HeyApiClient {
   /**
    * Summarize the session
    */
-  public summarize<ThrowOnError extends boolean = false>(
-    options: Options<SessionSummarizeData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionSummarizeResponses,
-      SessionSummarizeErrors,
-      ThrowOnError
-    >({
+  public summarize<ThrowOnError extends boolean = false>(options: Options<SessionSummarizeData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionSummarizeResponses, SessionSummarizeErrors, ThrowOnError>({
       url: "/session/{id}/summarize",
       ...options,
       headers: {
@@ -514,14 +602,8 @@ class Session extends _HeyApiClient {
   /**
    * List messages for a session
    */
-  public messages<ThrowOnError extends boolean = false>(
-    options: Options<SessionMessagesData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).get<
-      SessionMessagesResponses,
-      SessionMessagesErrors,
-      ThrowOnError
-    >({
+  public messages<ThrowOnError extends boolean = false>(options: Options<SessionMessagesData, ThrowOnError>) {
+    return (options.client ?? this._client).get<SessionMessagesResponses, SessionMessagesErrors, ThrowOnError>({
       url: "/session/{id}/message",
       ...options,
     })
@@ -530,14 +612,8 @@ class Session extends _HeyApiClient {
   /**
    * Create and send a new message to a session
    */
-  public prompt<ThrowOnError extends boolean = false>(
-    options: Options<SessionPromptData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionPromptResponses,
-      SessionPromptErrors,
-      ThrowOnError
-    >({
+  public prompt<ThrowOnError extends boolean = false>(options: Options<SessionPromptData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionPromptResponses, SessionPromptErrors, ThrowOnError>({
       url: "/session/{id}/message",
       ...options,
       headers: {
@@ -550,30 +626,32 @@ class Session extends _HeyApiClient {
   /**
    * Get a message from a session
    */
-  public message<ThrowOnError extends boolean = false>(
-    options: Options<SessionMessageData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).get<
-      SessionMessageResponses,
-      SessionMessageErrors,
-      ThrowOnError
-    >({
+  public message<ThrowOnError extends boolean = false>(options: Options<SessionMessageData, ThrowOnError>) {
+    return (options.client ?? this._client).get<SessionMessageResponses, SessionMessageErrors, ThrowOnError>({
       url: "/session/{id}/message/{messageID}",
       ...options,
     })
   }
 
   /**
+   * Create and send a new message to a session, start if needed and return immediately
+   */
+  public promptAsync<ThrowOnError extends boolean = false>(options: Options<SessionPromptAsyncData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionPromptAsyncResponses, SessionPromptAsyncErrors, ThrowOnError>({
+      url: "/session/{id}/prompt_async",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
    * Send a new command to a session
    */
-  public command<ThrowOnError extends boolean = false>(
-    options: Options<SessionCommandData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionCommandResponses,
-      SessionCommandErrors,
-      ThrowOnError
-    >({
+  public command<ThrowOnError extends boolean = false>(options: Options<SessionCommandData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionCommandResponses, SessionCommandErrors, ThrowOnError>({
       url: "/session/{id}/command",
       ...options,
       headers: {
@@ -586,14 +664,8 @@ class Session extends _HeyApiClient {
   /**
    * Run a shell command
    */
-  public shell<ThrowOnError extends boolean = false>(
-    options: Options<SessionShellData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionShellResponses,
-      SessionShellErrors,
-      ThrowOnError
-    >({
+  public shell<ThrowOnError extends boolean = false>(options: Options<SessionShellData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionShellResponses, SessionShellErrors, ThrowOnError>({
       url: "/session/{id}/shell",
       ...options,
       headers: {
@@ -606,14 +678,8 @@ class Session extends _HeyApiClient {
   /**
    * Revert a message
    */
-  public revert<ThrowOnError extends boolean = false>(
-    options: Options<SessionRevertData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionRevertResponses,
-      SessionRevertErrors,
-      ThrowOnError
-    >({
+  public revert<ThrowOnError extends boolean = false>(options: Options<SessionRevertData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionRevertResponses, SessionRevertErrors, ThrowOnError>({
       url: "/session/{id}/revert",
       ...options,
       headers: {
@@ -626,14 +692,8 @@ class Session extends _HeyApiClient {
   /**
    * Restore all reverted messages
    */
-  public unrevert<ThrowOnError extends boolean = false>(
-    options: Options<SessionUnrevertData, ThrowOnError>,
-  ) {
-    return (options.client ?? this._client).post<
-      SessionUnrevertResponses,
-      SessionUnrevertErrors,
-      ThrowOnError
-    >({
+  public unrevert<ThrowOnError extends boolean = false>(options: Options<SessionUnrevertData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionUnrevertResponses, SessionUnrevertErrors, ThrowOnError>({
       url: "/session/{id}/unrevert",
       ...options,
     })
@@ -644,14 +704,73 @@ class Command extends _HeyApiClient {
   /**
    * List all commands
    */
-  public list<ThrowOnError extends boolean = false>(
-    options?: Options<CommandListData, ThrowOnError>,
-  ) {
+  public list<ThrowOnError extends boolean = false>(options?: Options<CommandListData, ThrowOnError>) {
     return (options?.client ?? this._client).get<CommandListResponses, unknown, ThrowOnError>({
       url: "/command",
       ...options,
     })
   }
+}
+
+class Oauth extends _HeyApiClient {
+  /**
+   * Authorize a provider using OAuth
+   */
+  public authorize<ThrowOnError extends boolean = false>(options: Options<ProviderOauthAuthorizeData, ThrowOnError>) {
+    return (options.client ?? this._client).post<
+      ProviderOauthAuthorizeResponses,
+      ProviderOauthAuthorizeErrors,
+      ThrowOnError
+    >({
+      url: "/provider/{id}/oauth/authorize",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * Handle OAuth callback for a provider
+   */
+  public callback<ThrowOnError extends boolean = false>(options: Options<ProviderOauthCallbackData, ThrowOnError>) {
+    return (options.client ?? this._client).post<
+      ProviderOauthCallbackResponses,
+      ProviderOauthCallbackErrors,
+      ThrowOnError
+    >({
+      url: "/provider/{id}/oauth/callback",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+}
+
+class Provider extends _HeyApiClient {
+  /**
+   * List all providers
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<ProviderListData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<ProviderListResponses, unknown, ThrowOnError>({
+      url: "/provider",
+      ...options,
+    })
+  }
+
+  /**
+   * Get provider authentication methods
+   */
+  public auth<ThrowOnError extends boolean = false>(options?: Options<ProviderAuthData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<ProviderAuthResponses, unknown, ThrowOnError>({
+      url: "/provider/auth",
+      ...options,
+    })
+  }
+  oauth = new Oauth({ client: this._client })
 }
 
 class Find extends _HeyApiClient {
@@ -668,9 +787,7 @@ class Find extends _HeyApiClient {
   /**
    * Find files
    */
-  public files<ThrowOnError extends boolean = false>(
-    options: Options<FindFilesData, ThrowOnError>,
-  ) {
+  public files<ThrowOnError extends boolean = false>(options: Options<FindFilesData, ThrowOnError>) {
     return (options.client ?? this._client).get<FindFilesResponses, unknown, ThrowOnError>({
       url: "/find/file",
       ...options,
@@ -680,9 +797,7 @@ class Find extends _HeyApiClient {
   /**
    * Find workspace symbols
    */
-  public symbols<ThrowOnError extends boolean = false>(
-    options: Options<FindSymbolsData, ThrowOnError>,
-  ) {
+  public symbols<ThrowOnError extends boolean = false>(options: Options<FindSymbolsData, ThrowOnError>) {
     return (options.client ?? this._client).get<FindSymbolsResponses, unknown, ThrowOnError>({
       url: "/find/symbol",
       ...options,
@@ -714,9 +829,7 @@ class File extends _HeyApiClient {
   /**
    * Get file status
    */
-  public status<ThrowOnError extends boolean = false>(
-    options?: Options<FileStatusData, ThrowOnError>,
-  ) {
+  public status<ThrowOnError extends boolean = false>(options?: Options<FileStatusData, ThrowOnError>) {
     return (options?.client ?? this._client).get<FileStatusResponses, unknown, ThrowOnError>({
       url: "/file/status",
       ...options,
@@ -742,9 +855,7 @@ class App extends _HeyApiClient {
   /**
    * List all agents
    */
-  public agents<ThrowOnError extends boolean = false>(
-    options?: Options<AppAgentsData, ThrowOnError>,
-  ) {
+  public agents<ThrowOnError extends boolean = false>(options?: Options<AppAgentsData, ThrowOnError>) {
     return (options?.client ?? this._client).get<AppAgentsResponses, unknown, ThrowOnError>({
       url: "/agent",
       ...options,
@@ -752,234 +863,53 @@ class App extends _HeyApiClient {
   }
 }
 
-class Mcp extends _HeyApiClient {
-  /**
-   * Get MCP server status
-   */
-  public status<ThrowOnError extends boolean = false>(
-    options?: Options<McpStatusData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).get<McpStatusResponses, unknown, ThrowOnError>({
-      url: "/mcp",
-      ...options,
-    })
-  }
-}
-
-class Lsp extends _HeyApiClient {
-  /**
-   * Get LSP server status
-   */
-  public status<ThrowOnError extends boolean = false>(
-    options?: Options<LspStatusData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).get<LspStatusResponses, unknown, ThrowOnError>({
-      url: "/lsp",
-      ...options,
-    })
-  }
-}
-
-class Formatter extends _HeyApiClient {
-  /**
-   * Get formatter status
-   */
-  public status<ThrowOnError extends boolean = false>(
-    options?: Options<FormatterStatusData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).get<FormatterStatusResponses, unknown, ThrowOnError>({
-      url: "/formatter",
-      ...options,
-    })
-  }
-}
-
-class Control extends _HeyApiClient {
-  /**
-   * Get the next TUI request from the queue
-   */
-  public next<ThrowOnError extends boolean = false>(
-    options?: Options<TuiControlNextData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).get<TuiControlNextResponses, unknown, ThrowOnError>({
-      url: "/tui/control/next",
-      ...options,
-    })
-  }
-
-  /**
-   * Submit a response to the TUI request queue
-   */
-  public response<ThrowOnError extends boolean = false>(
-    options?: Options<TuiControlResponseData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<
-      TuiControlResponseResponses,
-      unknown,
-      ThrowOnError
-    >({
-      url: "/tui/control/response",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    })
-  }
-}
-
-class Tui extends _HeyApiClient {
-  /**
-   * Append prompt to the TUI
-   */
-  public appendPrompt<ThrowOnError extends boolean = false>(
-    options?: Options<TuiAppendPromptData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<
-      TuiAppendPromptResponses,
-      TuiAppendPromptErrors,
-      ThrowOnError
-    >({
-      url: "/tui/append-prompt",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    })
-  }
-
-  /**
-   * Open the help dialog
-   */
-  public openHelp<ThrowOnError extends boolean = false>(
-    options?: Options<TuiOpenHelpData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiOpenHelpResponses, unknown, ThrowOnError>({
-      url: "/tui/open-help",
-      ...options,
-    })
-  }
-
-  /**
-   * Open the session dialog
-   */
-  public openSessions<ThrowOnError extends boolean = false>(
-    options?: Options<TuiOpenSessionsData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiOpenSessionsResponses, unknown, ThrowOnError>({
-      url: "/tui/open-sessions",
-      ...options,
-    })
-  }
-
-  /**
-   * Open the theme dialog
-   */
-  public openThemes<ThrowOnError extends boolean = false>(
-    options?: Options<TuiOpenThemesData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiOpenThemesResponses, unknown, ThrowOnError>({
-      url: "/tui/open-themes",
-      ...options,
-    })
-  }
-
-  /**
-   * Open the model dialog
-   */
-  public openModels<ThrowOnError extends boolean = false>(
-    options?: Options<TuiOpenModelsData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiOpenModelsResponses, unknown, ThrowOnError>({
-      url: "/tui/open-models",
-      ...options,
-    })
-  }
-
-  /**
-   * Submit the prompt
-   */
-  public submitPrompt<ThrowOnError extends boolean = false>(
-    options?: Options<TuiSubmitPromptData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiSubmitPromptResponses, unknown, ThrowOnError>({
-      url: "/tui/submit-prompt",
-      ...options,
-    })
-  }
-
-  /**
-   * Clear the prompt
-   */
-  public clearPrompt<ThrowOnError extends boolean = false>(
-    options?: Options<TuiClearPromptData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiClearPromptResponses, unknown, ThrowOnError>({
-      url: "/tui/clear-prompt",
-      ...options,
-    })
-  }
-
-  /**
-   * Execute a TUI command (e.g. agent_cycle)
-   */
-  public executeCommand<ThrowOnError extends boolean = false>(
-    options?: Options<TuiExecuteCommandData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<
-      TuiExecuteCommandResponses,
-      TuiExecuteCommandErrors,
-      ThrowOnError
-    >({
-      url: "/tui/execute-command",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    })
-  }
-
-  /**
-   * Show a toast notification in the TUI
-   */
-  public showToast<ThrowOnError extends boolean = false>(
-    options?: Options<TuiShowToastData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<TuiShowToastResponses, unknown, ThrowOnError>({
-      url: "/tui/show-toast",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    })
-  }
-
-  /**
-   * Publish a TUI event
-   */
-  public publish<ThrowOnError extends boolean = false>(
-    options?: Options<TuiPublishData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).post<
-      TuiPublishResponses,
-      TuiPublishErrors,
-      ThrowOnError
-    >({
-      url: "/tui/publish",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    })
-  }
-  control = new Control({ client: this._client })
-}
-
 class Auth extends _HeyApiClient {
+  /**
+   * Remove OAuth credentials for an MCP server
+   */
+  public remove<ThrowOnError extends boolean = false>(options: Options<McpAuthRemoveData, ThrowOnError>) {
+    return (options.client ?? this._client).delete<McpAuthRemoveResponses, McpAuthRemoveErrors, ThrowOnError>({
+      url: "/mcp/{name}/auth",
+      ...options,
+    })
+  }
+
+  /**
+   * Start OAuth authentication flow for an MCP server
+   */
+  public start<ThrowOnError extends boolean = false>(options: Options<McpAuthStartData, ThrowOnError>) {
+    return (options.client ?? this._client).post<McpAuthStartResponses, McpAuthStartErrors, ThrowOnError>({
+      url: "/mcp/{name}/auth",
+      ...options,
+    })
+  }
+
+  /**
+   * Complete OAuth authentication with authorization code
+   */
+  public callback<ThrowOnError extends boolean = false>(options: Options<McpAuthCallbackData, ThrowOnError>) {
+    return (options.client ?? this._client).post<McpAuthCallbackResponses, McpAuthCallbackErrors, ThrowOnError>({
+      url: "/mcp/{name}/auth/callback",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * Start OAuth flow and wait for callback (opens browser)
+   */
+  public authenticate<ThrowOnError extends boolean = false>(options: Options<McpAuthAuthenticateData, ThrowOnError>) {
+    return (options.client ?? this._client).post<McpAuthAuthenticateResponses, McpAuthAuthenticateErrors, ThrowOnError>(
+      {
+        url: "/mcp/{name}/auth/authenticate",
+        ...options,
+      },
+    )
+  }
+
   /**
    * Set authentication credentials
    */
@@ -995,18 +925,229 @@ class Auth extends _HeyApiClient {
   }
 }
 
+class Mcp extends _HeyApiClient {
+  /**
+   * Get MCP server status
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<McpStatusData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<McpStatusResponses, unknown, ThrowOnError>({
+      url: "/mcp",
+      ...options,
+    })
+  }
+
+  /**
+   * Add MCP server dynamically
+   */
+  public add<ThrowOnError extends boolean = false>(options?: Options<McpAddData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<McpAddResponses, McpAddErrors, ThrowOnError>({
+      url: "/mcp",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Connect an MCP server
+   */
+  public connect<ThrowOnError extends boolean = false>(options: Options<McpConnectData, ThrowOnError>) {
+    return (options.client ?? this._client).post<McpConnectResponses, unknown, ThrowOnError>({
+      url: "/mcp/{name}/connect",
+      ...options,
+    })
+  }
+
+  /**
+   * Disconnect an MCP server
+   */
+  public disconnect<ThrowOnError extends boolean = false>(options: Options<McpDisconnectData, ThrowOnError>) {
+    return (options.client ?? this._client).post<McpDisconnectResponses, unknown, ThrowOnError>({
+      url: "/mcp/{name}/disconnect",
+      ...options,
+    })
+  }
+
+  auth = new Auth({ client: this._client })
+}
+
+class Lsp extends _HeyApiClient {
+  /**
+   * Get LSP server status
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<LspStatusData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<LspStatusResponses, unknown, ThrowOnError>({
+      url: "/lsp",
+      ...options,
+    })
+  }
+}
+
+class Formatter extends _HeyApiClient {
+  /**
+   * Get formatter status
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<FormatterStatusData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<FormatterStatusResponses, unknown, ThrowOnError>({
+      url: "/formatter",
+      ...options,
+    })
+  }
+}
+
+class Control extends _HeyApiClient {
+  /**
+   * Get the next TUI request from the queue
+   */
+  public next<ThrowOnError extends boolean = false>(options?: Options<TuiControlNextData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<TuiControlNextResponses, unknown, ThrowOnError>({
+      url: "/tui/control/next",
+      ...options,
+    })
+  }
+
+  /**
+   * Submit a response to the TUI request queue
+   */
+  public response<ThrowOnError extends boolean = false>(options?: Options<TuiControlResponseData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiControlResponseResponses, unknown, ThrowOnError>({
+      url: "/tui/control/response",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+}
+
+class Tui extends _HeyApiClient {
+  /**
+   * Append prompt to the TUI
+   */
+  public appendPrompt<ThrowOnError extends boolean = false>(options?: Options<TuiAppendPromptData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiAppendPromptResponses, TuiAppendPromptErrors, ThrowOnError>({
+      url: "/tui/append-prompt",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Open the help dialog
+   */
+  public openHelp<ThrowOnError extends boolean = false>(options?: Options<TuiOpenHelpData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiOpenHelpResponses, unknown, ThrowOnError>({
+      url: "/tui/open-help",
+      ...options,
+    })
+  }
+
+  /**
+   * Open the session dialog
+   */
+  public openSessions<ThrowOnError extends boolean = false>(options?: Options<TuiOpenSessionsData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiOpenSessionsResponses, unknown, ThrowOnError>({
+      url: "/tui/open-sessions",
+      ...options,
+    })
+  }
+
+  /**
+   * Open the theme dialog
+   */
+  public openThemes<ThrowOnError extends boolean = false>(options?: Options<TuiOpenThemesData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiOpenThemesResponses, unknown, ThrowOnError>({
+      url: "/tui/open-themes",
+      ...options,
+    })
+  }
+
+  /**
+   * Open the model dialog
+   */
+  public openModels<ThrowOnError extends boolean = false>(options?: Options<TuiOpenModelsData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiOpenModelsResponses, unknown, ThrowOnError>({
+      url: "/tui/open-models",
+      ...options,
+    })
+  }
+
+  /**
+   * Submit the prompt
+   */
+  public submitPrompt<ThrowOnError extends boolean = false>(options?: Options<TuiSubmitPromptData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiSubmitPromptResponses, unknown, ThrowOnError>({
+      url: "/tui/submit-prompt",
+      ...options,
+    })
+  }
+
+  /**
+   * Clear the prompt
+   */
+  public clearPrompt<ThrowOnError extends boolean = false>(options?: Options<TuiClearPromptData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiClearPromptResponses, unknown, ThrowOnError>({
+      url: "/tui/clear-prompt",
+      ...options,
+    })
+  }
+
+  /**
+   * Execute a TUI command (e.g. agent_cycle)
+   */
+  public executeCommand<ThrowOnError extends boolean = false>(options?: Options<TuiExecuteCommandData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiExecuteCommandResponses, TuiExecuteCommandErrors, ThrowOnError>({
+      url: "/tui/execute-command",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Show a toast notification in the TUI
+   */
+  public showToast<ThrowOnError extends boolean = false>(options?: Options<TuiShowToastData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiShowToastResponses, unknown, ThrowOnError>({
+      url: "/tui/show-toast",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Publish a TUI event
+   */
+  public publish<ThrowOnError extends boolean = false>(options?: Options<TuiPublishData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<TuiPublishResponses, TuiPublishErrors, ThrowOnError>({
+      url: "/tui/publish",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+  control = new Control({ client: this._client })
+}
+
 class Event extends _HeyApiClient {
   /**
    * Get events
    */
-  public subscribe<ThrowOnError extends boolean = false>(
-    options?: Options<EventSubscribeData, ThrowOnError>,
-  ) {
-    return (options?.client ?? this._client).get.sse<
-      EventSubscribeResponses,
-      unknown,
-      ThrowOnError
-    >({
+  public subscribe<ThrowOnError extends boolean = false>(options?: Options<EventSubscribeData, ThrowOnError>) {
+    return (options?.client ?? this._client).get.sse<EventSubscribeResponses, unknown, ThrowOnError>({
       url: "/event",
       ...options,
     })
@@ -1033,12 +1174,17 @@ export class OpencodeClient extends _HeyApiClient {
       },
     })
   }
+  global = new Global({ client: this._client })
   project = new Project({ client: this._client })
+  pty = new Pty({ client: this._client })
   config = new Config({ client: this._client })
   tool = new Tool({ client: this._client })
+  instance = new Instance({ client: this._client })
   path = new Path({ client: this._client })
+  vcs = new Vcs({ client: this._client })
   session = new Session({ client: this._client })
   command = new Command({ client: this._client })
+  provider = new Provider({ client: this._client })
   find = new Find({ client: this._client })
   file = new File({ client: this._client })
   app = new App({ client: this._client })

@@ -5,7 +5,7 @@ import { graphql } from "@octokit/graphql"
 import * as core from "@actions/core"
 import * as github from "@actions/github"
 import type { Context as GitHubContext } from "@actions/github/lib/context"
-import type { IssueCommentEvent } from "@octokit/webhooks-types"
+import type { IssueCommentEvent, PullRequestReviewCommentEvent } from "@octokit/webhooks-types"
 import { createOpencodeClient } from "@opencode-ai/sdk"
 import { spawn } from "node:child_process"
 
@@ -124,7 +124,7 @@ let exitCode = 0
 type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
 
 try {
-  assertContextEvent("issue_comment")
+  assertContextEvent("issue_comment", "pull_request_review_comment")
   assertPayloadKeyword()
   await assertOpencodeConnected()
 
@@ -171,9 +171,7 @@ try {
         const summary = await summarize(response)
         await pushToLocalBranch(summary)
       }
-      const hasShared = prData.comments.nodes.some((c) =>
-        c.body.includes(`${useShareUrl()}/s/${shareId}`),
-      )
+      const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${useShareUrl()}/s/${shareId}`))
       await updateComment(`${response}${footer({ image: !hasShared })}`)
     }
     // Fork PR
@@ -185,9 +183,7 @@ try {
         const summary = await summarize(response)
         await pushToForkBranch(summary, prData)
       }
-      const hasShared = prData.comments.nodes.some((c) =>
-        c.body.includes(`${useShareUrl()}/s/${shareId}`),
-      )
+      const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${useShareUrl()}/s/${shareId}`))
       await updateComment(`${response}${footer({ image: !hasShared })}`)
     }
   }
@@ -245,10 +241,28 @@ function createOpencode() {
 }
 
 function assertPayloadKeyword() {
-  const payload = useContext().payload as IssueCommentEvent
+  const payload = useContext().payload as IssueCommentEvent | PullRequestReviewCommentEvent
   const body = payload.comment.body.trim()
   if (!body.match(/(?:^|\s)(?:\/opencode|\/oc)(?=$|\s)/)) {
     throw new Error("Comments must mention `/opencode` or `/oc`")
+  }
+}
+
+function getReviewCommentContext() {
+  const context = useContext()
+  if (context.eventName !== "pull_request_review_comment") {
+    return null
+  }
+
+  const payload = context.payload as PullRequestReviewCommentEvent
+  return {
+    file: payload.comment.path,
+    diffHunk: payload.comment.diff_hunk,
+    line: payload.comment.line,
+    originalLine: payload.comment.original_line,
+    position: payload.comment.position,
+    commitId: payload.comment.commit_id,
+    originalCommitId: payload.comment.original_commit_id,
   }
 }
 
@@ -257,11 +271,17 @@ async function assertOpencodeConnected() {
   let connected = false
   do {
     try {
-      await client.app.get<true>()
+      await client.app.log<true>({
+        body: {
+          service: "github-workflow",
+          level: "info",
+          message: "Prepare to react to Github Workflow event",
+        },
+      })
       connected = true
       break
     } catch (e) {}
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await Bun.sleep(300)
   } while (retry++ < 30)
 
   if (!connected) {
@@ -296,6 +316,10 @@ function useEnvRunUrl() {
   if (!runId) throw new Error(`Environment variable "GITHUB_RUN_ID" is not set`)
 
   return `/${repo.owner}/${repo.repo}/actions/runs/${runId}`
+}
+
+function useEnvAgent() {
+  return process.env["AGENT"] || undefined
 }
 
 function useEnvShare() {
@@ -368,9 +392,7 @@ async function getAccessToken() {
 
   if (!response.ok) {
     const responseJson = (await response.json()) as { error?: string }
-    throw new Error(
-      `App token exchange failed: ${response.status} ${response.statusText} - ${responseJson.error}`,
-    )
+    throw new Error(`App token exchange failed: ${response.status} ${response.statusText} - ${responseJson.error}`)
   }
 
   const responseJson = (await response.json()) as { token: string }
@@ -389,11 +411,24 @@ async function createComment() {
 }
 
 async function getUserPrompt() {
+  const context = useContext()
+  const payload = context.payload as IssueCommentEvent | PullRequestReviewCommentEvent
+  const reviewContext = getReviewCommentContext()
+
   let prompt = (() => {
-    const payload = useContext().payload as IssueCommentEvent
     const body = payload.comment.body.trim()
-    if (body === "/opencode" || body === "/oc") return "Summarize this thread"
-    if (body.includes("/opencode") || body.includes("/oc")) return body
+    if (body === "/opencode" || body === "/oc") {
+      if (reviewContext) {
+        return `Review this code change and suggest improvements for the commented lines:\n\nFile: ${reviewContext.file}\nLines: ${reviewContext.line}\n\n${reviewContext.diffHunk}`
+      }
+      return "Summarize this thread"
+    }
+    if (body.includes("/opencode") || body.includes("/oc")) {
+      if (reviewContext) {
+        return `${body}\n\nContext: You are reviewing a comment on file "${reviewContext.file}" at line ${reviewContext.line}.\n\nDiff context:\n${reviewContext.diffHunk}`
+      }
+      return body
+    }
     throw new Error("Comments must mention `/opencode` or `/oc`")
   })()
 
@@ -411,12 +446,8 @@ async function getUserPrompt() {
   // ie. <img alt="Image" src="https://github.com/user-attachments/assets/xxxx" />
   // ie. [api.json](https://github.com/user-attachments/files/21433810/api.json)
   // ie. ![Image](https://github.com/user-attachments/assets/xxxx)
-  const mdMatches = prompt.matchAll(
-    /!?\[.*?\]\((https:\/\/github\.com\/user-attachments\/[^)]+)\)/gi,
-  )
-  const tagMatches = prompt.matchAll(
-    /<img .*?src="(https:\/\/github\.com\/user-attachments\/[^"]+)" \/>/gi,
-  )
+  const mdMatches = prompt.matchAll(/!?\[.*?\]\((https:\/\/github\.com\/user-attachments\/[^)]+)\)/gi)
+  const tagMatches = prompt.matchAll(/<img .*?src="(https:\/\/github\.com\/user-attachments\/[^"]+)" \/>/gi)
   const matches = [...mdMatches, ...tagMatches].sort((a, b) => a.index - b.index)
   console.log("Images", JSON.stringify(matches, null, 2))
 
@@ -443,8 +474,7 @@ async function getUserPrompt() {
 
     // Replace img tag with file path, ie. @image.png
     const replacement = `@${filename}`
-    prompt =
-      prompt.slice(0, start + offset) + replacement + prompt.slice(start + offset + tag.length)
+    prompt = prompt.slice(0, start + offset) + replacement + prompt.slice(start + offset + tag.length)
     offset += replacement.length - tag.length
 
     const contentType = res.headers.get("content-type")
@@ -512,12 +542,7 @@ async function subscribeSessionEvents() {
                     ? JSON.stringify(part.state.input)
                     : "Unknown"
                 console.log()
-                console.log(
-                  color + `|`,
-                  "\x1b[0m\x1b[2m" + ` ${tool.padEnd(7, " ")}`,
-                  "",
-                  "\x1b[0m" + title,
-                )
+                console.log(color + `|`, "\x1b[0m\x1b[2m" + ` ${tool.padEnd(7, " ")}`, "", "\x1b[0m" + title)
               }
 
               if (part.type === "text") {
@@ -549,24 +574,49 @@ async function subscribeSessionEvents() {
 }
 
 async function summarize(response: string) {
-  const payload = useContext().payload as IssueCommentEvent
   try {
     return await chat(`Summarize the following in less than 40 characters:\n\n${response}`)
   } catch (e) {
+    if (isScheduleEvent()) {
+      return "Scheduled task changes"
+    }
+    const payload = useContext().payload as IssueCommentEvent
     return `Fix issue: ${payload.issue.title}`
   }
+}
+
+async function resolveAgent(): Promise<string | undefined> {
+  const envAgent = useEnvAgent()
+  if (!envAgent) return undefined
+
+  // Validate the agent exists and is a primary agent
+  const agents = await client.agent.list<true>()
+  const agent = agents.data?.find((a) => a.name === envAgent)
+
+  if (!agent) {
+    console.warn(`agent "${envAgent}" not found. Falling back to default agent`)
+    return undefined
+  }
+
+  if (agent.mode === "subagent") {
+    console.warn(`agent "${envAgent}" is a subagent, not a primary agent. Falling back to default agent`)
+    return undefined
+  }
+
+  return envAgent
 }
 
 async function chat(text: string, files: PromptFiles = []) {
   console.log("Sending message to opencode...")
   const { providerID, modelID } = useEnvModel()
+  const agent = await resolveAgent()
 
   const chat = await client.session.chat<true>({
     path: session,
     body: {
       providerID,
       modelID,
-      agent: "build",
+      agent,
       parts: [
         {
           type: "text",
@@ -729,8 +779,7 @@ async function assertPermissions() {
     throw new Error(`Failed to check permissions for user ${actor}: ${error}`)
   }
 
-  if (!["admin", "write"].includes(permission))
-    throw new Error(`User ${actor} does not have write permissions`)
+  if (!["admin", "write"].includes(permission)) throw new Error(`User ${actor} does not have write permissions`)
 }
 
 async function updateComment(body: string) {
@@ -774,9 +823,7 @@ function footer(opts?: { image?: boolean }) {
 
     return `<a href="${useShareUrl()}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
   })()
-  const shareUrl = shareId
-    ? `[opencode session](${useShareUrl()}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;`
-    : ""
+  const shareUrl = shareId ? `[opencode session](${useShareUrl()}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
   return `\n\n${image}${shareUrl}[github run](${useEnvRunUrl()})`
 }
 
@@ -959,13 +1006,9 @@ function buildPromptDataForPR(pr: GitHubPullRequest) {
     })
     .map((c) => `- ${c.author.login} at ${c.createdAt}: ${c.body}`)
 
-  const files = (pr.files.nodes || []).map(
-    (f) => `- ${f.path} (${f.changeType}) +${f.additions}/-${f.deletions}`,
-  )
+  const files = (pr.files.nodes || []).map((f) => `- ${f.path} (${f.changeType}) +${f.additions}/-${f.deletions}`)
   const reviewData = (pr.reviews.nodes || []).map((r) => {
-    const comments = (r.comments.nodes || []).map(
-      (c) => `    - ${c.path}:${c.line ?? "?"}: ${c.body}`,
-    )
+    const comments = (r.comments.nodes || []).map((c) => `    - ${c.path}:${c.line ?? "?"}: ${c.body}`)
     return [
       `- ${r.author.login} at ${r.submittedAt}:`,
       `  - Review body: ${r.body}`,
@@ -987,15 +1030,9 @@ function buildPromptDataForPR(pr: GitHubPullRequest) {
     `Deletions: ${pr.deletions}`,
     `Total Commits: ${pr.commits.totalCount}`,
     `Changed Files: ${pr.files.nodes.length} files`,
-    ...(comments.length > 0
-      ? ["<pull_request_comments>", ...comments, "</pull_request_comments>"]
-      : []),
-    ...(files.length > 0
-      ? ["<pull_request_changed_files>", ...files, "</pull_request_changed_files>"]
-      : []),
-    ...(reviewData.length > 0
-      ? ["<pull_request_reviews>", ...reviewData, "</pull_request_reviews>"]
-      : []),
+    ...(comments.length > 0 ? ["<pull_request_comments>", ...comments, "</pull_request_comments>"] : []),
+    ...(files.length > 0 ? ["<pull_request_changed_files>", ...files, "</pull_request_changed_files>"] : []),
+    ...(reviewData.length > 0 ? ["<pull_request_reviews>", ...reviewData, "</pull_request_reviews>"] : []),
     "</pull_request>",
   ].join("\n")
 }

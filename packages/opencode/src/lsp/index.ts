@@ -1,18 +1,21 @@
+import { BusEvent } from "@/bus/bus-event"
+import { Bus } from "@/bus"
 import { Log } from "../util/log"
 import { LSPClient } from "./client"
 import path from "path"
+import { pathToFileURL } from "url"
 import { LSPServer } from "./server"
 import z from "zod"
 import { Config } from "../config/config"
 import { spawn } from "child_process"
 import { Instance } from "../project/instance"
-import { Bus } from "../bus"
+import { Flag } from "@/flag/flag"
 
 export namespace LSP {
   const log = Log.create({ service: "lsp" })
 
   export const Event = {
-    Updated: Bus.event("lsp.updated", z.object({})),
+    Updated: BusEvent.define("lsp.updated", z.object({})),
   }
 
   export const Range = z
@@ -58,14 +61,43 @@ export namespace LSP {
     })
   export type DocumentSymbol = z.infer<typeof DocumentSymbol>
 
+  const filterExperimentalServers = (servers: Record<string, LSPServer.Info>) => {
+    if (Flag.OPENCODE_EXPERIMENTAL_LSP_TY) {
+      // If experimental flag is enabled, disable pyright
+      if (servers["pyright"]) {
+        log.info("LSP server pyright is disabled because OPENCODE_EXPERIMENTAL_LSP_TY is enabled")
+        delete servers["pyright"]
+      }
+    } else {
+      // If experimental flag is disabled, disable ty
+      if (servers["ty"]) {
+        delete servers["ty"]
+      }
+    }
+  }
+
   const state = Instance.state(
     async () => {
       const clients: LSPClient.Info[] = []
       const servers: Record<string, LSPServer.Info> = {}
+      const cfg = await Config.get()
+
+      if (cfg.lsp === false) {
+        log.info("all LSPs are disabled")
+        return {
+          broken: new Set<string>(),
+          servers,
+          clients,
+          spawning: new Map<string, Promise<LSPClient.Info | undefined>>(),
+        }
+      }
+
       for (const server of Object.values(LSPServer)) {
         servers[server.id] = server
       }
-      const cfg = await Config.get()
+
+      filterExperimentalServers(servers)
+
       for (const [name, item] of Object.entries(cfg.lsp ?? {})) {
         const existing = servers[name]
         if (item.disabled) {
@@ -103,6 +135,7 @@ export namespace LSP {
         broken: new Set<string>(),
         servers,
         clients,
+        spawning: new Map<string, Promise<LSPClient.Info | undefined>>(),
       }
     },
     async (state) => {
@@ -145,8 +178,52 @@ export namespace LSP {
     const s = await state()
     const extension = path.parse(file).ext || file
     const result: LSPClient.Info[] = []
+
+    async function schedule(server: LSPServer.Info, root: string, key: string) {
+      const handle = await server
+        .spawn(root)
+        .then((value) => {
+          if (!value) s.broken.add(key)
+          return value
+        })
+        .catch((err) => {
+          s.broken.add(key)
+          log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
+          return undefined
+        })
+
+      if (!handle) return undefined
+      log.info("spawned lsp server", { serverID: server.id })
+
+      const client = await LSPClient.create({
+        serverID: server.id,
+        server: handle,
+        root,
+      }).catch((err) => {
+        s.broken.add(key)
+        handle.process.kill()
+        log.error(`Failed to initialize LSP client ${server.id}`, { error: err })
+        return undefined
+      })
+
+      if (!client) {
+        handle.process.kill()
+        return undefined
+      }
+
+      const existing = s.clients.find((x) => x.root === root && x.serverID === server.id)
+      if (existing) {
+        handle.process.kill()
+        return existing
+      }
+
+      s.clients.push(client)
+      return client
+    }
+
     for (const server of Object.values(s.servers)) {
       if (server.extensions.length && !server.extensions.includes(extension)) continue
+
       const root = await server.root(file)
       if (!root) continue
       if (s.broken.has(root + server.id)) continue
@@ -156,60 +233,64 @@ export namespace LSP {
         result.push(match)
         continue
       }
-      const handle = await server
-        .spawn(root)
-        .then((h) => {
-          if (h === undefined) {
-            s.broken.add(root + server.id)
-          }
-          return h
-        })
-        .catch((err) => {
-          s.broken.add(root + server.id)
-          log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
-          return undefined
-        })
-      if (!handle) continue
-      log.info("spawned lsp server", { serverID: server.id })
 
-      const client = await LSPClient.create({
-        serverID: server.id,
-        server: handle,
-        root,
-      }).catch((err) => {
-        s.broken.add(root + server.id)
-        handle.process.kill()
-        log.error(`Failed to initialize LSP client ${server.id}`, {
-          error: err,
-        })
-        return undefined
+      const inflight = s.spawning.get(root + server.id)
+      if (inflight) {
+        const client = await inflight
+        if (!client) continue
+        result.push(client)
+        continue
+      }
+
+      const task = schedule(server, root, root + server.id)
+      s.spawning.set(root + server.id, task)
+
+      task.finally(() => {
+        if (s.spawning.get(root + server.id) === task) {
+          s.spawning.delete(root + server.id)
+        }
       })
+
+      const client = await task
       if (!client) continue
-      s.clients.push(client)
+
       result.push(client)
       Bus.publish(Event.Updated, {})
     }
+
     return result
   }
 
-  export async function touchFile(input: string, waitForDiagnostics?: boolean) {
-    const clients = await getClients(input)
-    await run(async (client) => {
-      if (!clients.includes(client)) return
+  export async function hasClients(file: string) {
+    const s = await state()
+    const extension = path.parse(file).ext || file
+    for (const server of Object.values(s.servers)) {
+      if (server.extensions.length && !server.extensions.includes(extension)) continue
+      const root = await server.root(file)
+      if (!root) continue
+      if (s.broken.has(root + server.id)) continue
+      return true
+    }
+    return false
+  }
 
-      const wait = waitForDiagnostics
-        ? client.waitForDiagnostics({ path: input })
-        : Promise.resolve()
-      await client.notify.open({ path: input })
-      return wait
-    }).catch((err) => {
+  export async function touchFile(input: string, waitForDiagnostics?: boolean) {
+    log.info("touching file", { file: input })
+    const clients = await getClients(input)
+    await Promise.all(
+      clients.map(async (client) => {
+        const wait = waitForDiagnostics ? client.waitForDiagnostics({ path: input }) : Promise.resolve()
+        await client.notify.open({ path: input })
+        return wait
+      }),
+    ).catch((err) => {
       log.error("failed to touch file", { err, file: input })
     })
   }
 
   export async function diagnostics() {
     const results: Record<string, LSPClient.Diagnostic[]> = {}
-    for (const result of await run(async (client) => client.diagnostics)) {
+    for (const result of await runAll(async (client) => client.diagnostics)) {
       for (const [path, diagnostics] of result.entries()) {
         const arr = results[path] || []
         arr.push(...diagnostics)
@@ -220,16 +301,18 @@ export namespace LSP {
   }
 
   export async function hover(input: { file: string; line: number; character: number }) {
-    return run((client) => {
-      return client.connection.sendRequest("textDocument/hover", {
-        textDocument: {
-          uri: `file://${input.file}`,
-        },
-        position: {
-          line: input.line,
-          character: input.character,
-        },
-      })
+    return run(input.file, (client) => {
+      return client.connection
+        .sendRequest("textDocument/hover", {
+          textDocument: {
+            uri: pathToFileURL(input.file).href,
+          },
+          position: {
+            line: input.line,
+            character: input.character,
+          },
+        })
+        .catch(() => null)
     })
   }
 
@@ -274,7 +357,7 @@ export namespace LSP {
   ]
 
   export async function workspaceSymbol(query: string) {
-    return run((client) =>
+    return runAll((client) =>
       client.connection
         .sendRequest("workspace/symbol", {
           query,
@@ -286,7 +369,8 @@ export namespace LSP {
   }
 
   export async function documentSymbol(uri: string) {
-    return run((client) =>
+    const file = new URL(uri).pathname
+    return run(file, (client) =>
       client.connection
         .sendRequest("textDocument/documentSymbol", {
           textDocument: {
@@ -299,8 +383,85 @@ export namespace LSP {
       .then((result) => result.filter(Boolean))
   }
 
-  async function run<T>(input: (client: LSPClient.Info) => Promise<T>): Promise<T[]> {
+  export async function definition(input: { file: string; line: number; character: number }) {
+    return run(input.file, (client) =>
+      client.connection
+        .sendRequest("textDocument/definition", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+        })
+        .catch(() => null),
+    ).then((result) => result.flat().filter(Boolean))
+  }
+
+  export async function references(input: { file: string; line: number; character: number }) {
+    return run(input.file, (client) =>
+      client.connection
+        .sendRequest("textDocument/references", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+          context: { includeDeclaration: true },
+        })
+        .catch(() => []),
+    ).then((result) => result.flat().filter(Boolean))
+  }
+
+  export async function implementation(input: { file: string; line: number; character: number }) {
+    return run(input.file, (client) =>
+      client.connection
+        .sendRequest("textDocument/implementation", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+        })
+        .catch(() => null),
+    ).then((result) => result.flat().filter(Boolean))
+  }
+
+  export async function prepareCallHierarchy(input: { file: string; line: number; character: number }) {
+    return run(input.file, (client) =>
+      client.connection
+        .sendRequest("textDocument/prepareCallHierarchy", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+        })
+        .catch(() => []),
+    ).then((result) => result.flat().filter(Boolean))
+  }
+
+  export async function incomingCalls(input: { file: string; line: number; character: number }) {
+    return run(input.file, async (client) => {
+      const items = (await client.connection
+        .sendRequest("textDocument/prepareCallHierarchy", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+        })
+        .catch(() => [])) as any[]
+      if (!items?.length) return []
+      return client.connection.sendRequest("callHierarchy/incomingCalls", { item: items[0] }).catch(() => [])
+    }).then((result) => result.flat().filter(Boolean))
+  }
+
+  export async function outgoingCalls(input: { file: string; line: number; character: number }) {
+    return run(input.file, async (client) => {
+      const items = (await client.connection
+        .sendRequest("textDocument/prepareCallHierarchy", {
+          textDocument: { uri: pathToFileURL(input.file).href },
+          position: { line: input.line, character: input.character },
+        })
+        .catch(() => [])) as any[]
+      if (!items?.length) return []
+      return client.connection.sendRequest("callHierarchy/outgoingCalls", { item: items[0] }).catch(() => [])
+    }).then((result) => result.flat().filter(Boolean))
+  }
+
+  async function runAll<T>(input: (client: LSPClient.Info) => Promise<T>): Promise<T[]> {
     const clients = await state().then((x) => x.clients)
+    const tasks = clients.map((x) => input(x))
+    return Promise.all(tasks)
+  }
+
+  async function run<T>(file: string, input: (client: LSPClient.Info) => Promise<T>): Promise<T[]> {
+    const clients = await getClients(file)
     const tasks = clients.map((x) => input(x))
     return Promise.all(tasks)
   }

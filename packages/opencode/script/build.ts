@@ -61,45 +61,111 @@ import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
 
 const singleFlag = process.argv.includes("--single")
+const baselineFlag = process.argv.includes("--baseline")
+const skipInstall = process.argv.includes("--skip-install")
 
-const allTargets = [
-  ["windows", "x64"],
-  ["linux", "arm64"],
-  ["linux", "x64"],
-  ["linux", "x64-baseline"],
-  ["darwin", "x64"],
-  ["darwin", "x64-baseline"],
-  ["darwin", "arm64"],
+const allTargets: {
+  os: string
+  arch: "arm64" | "x64"
+  abi?: "musl"
+  avx2?: false
+}[] = [
+  {
+    os: "linux",
+    arch: "arm64",
+  },
+  {
+    os: "linux",
+    arch: "x64",
+  },
+  {
+    os: "linux",
+    arch: "x64",
+    avx2: false,
+  },
+  {
+    os: "linux",
+    arch: "arm64",
+    abi: "musl",
+  },
+  {
+    os: "linux",
+    arch: "x64",
+    abi: "musl",
+  },
+  {
+    os: "linux",
+    arch: "x64",
+    abi: "musl",
+    avx2: false,
+  },
+  {
+    os: "darwin",
+    arch: "arm64",
+  },
+  {
+    os: "darwin",
+    arch: "x64",
+  },
+  {
+    os: "darwin",
+    arch: "x64",
+    avx2: false,
+  },
+  {
+    os: "win32",
+    arch: "x64",
+  },
+  {
+    os: "win32",
+    arch: "x64",
+    avx2: false,
+  },
 ]
 
 const targets = singleFlag
-  ? allTargets.filter(([os, arch]) => os === process.platform && arch === process.arch)
+  ? allTargets.filter((item) => {
+      if (item.os !== process.platform || item.arch !== process.arch) {
+        return false
+      }
+
+      // When building for the current platform, prefer a single native binary by default.
+      // Baseline binaries require additional Bun artifacts and can be flaky to download.
+      if (item.avx2 === false) {
+        return baselineFlag
+      }
+
+      return true
+    })
   : allTargets
 
 await $`rm -rf dist`
 
 const binaries: Record<string, string> = {}
-for (const [os, arch] of targets) {
-  console.log(`building ${os}-${arch}`)
-  const name = `${pkg.name}-${os}-${arch}`
+if (!skipInstall) {
+  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
+  await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
+}
+for (const item of targets) {
+  const name = [
+    pkg.name,
+    // changing to win32 flags npm for some reason
+    item.os === "win32" ? "windows" : item.os,
+    item.arch,
+    item.avx2 === false ? "baseline" : undefined,
+    item.abi === undefined ? undefined : item.abi,
+  ]
+    .filter(Boolean)
+    .join("-")
+  console.log(`building ${name}`)
   await $`mkdir -p dist/${name}/bin`
 
-  const opentui = `@opentui/core-${os === "windows" ? "win32" : os}-${arch.replace("-baseline", "")}`
-  await $`mkdir -p ../../node_modules/${opentui}`
-  await $`npm pack ${opentui}@${pkg.dependencies["@opentui/core"]}`.cwd(
-    path.join(dir, "../../node_modules"),
-  )
-  await $`tar -xf ../../node_modules/${opentui.replace("@opentui/", "opentui-")}-*.tgz -C ../../node_modules/${opentui} --strip-components=1`
-
-  const watcher = `@parcel/watcher-${os === "windows" ? "win32" : os}-${arch.replace("-baseline", "")}${os === "linux" ? "-glibc" : ""}`
-  await $`mkdir -p ../../node_modules/${watcher}`
-  await $`npm pack ${watcher}`.cwd(path.join(dir, "../../node_modules")).quiet()
-  await $`tar -xf ../../node_modules/${watcher.replace("@parcel/", "parcel-")}-*.tgz -C ../../node_modules/${watcher} --strip-components=1`
-
-  const parserWorker = fs.realpathSync(
-    path.resolve(dir, "./node_modules/@opentui/core/parser.worker.js"),
-  )
+  const parserWorker = fs.realpathSync(path.resolve(dir, "./node_modules/@opentui/core/parser.worker.js"))
   const workerPath = "./src/cli/cmd/tui/worker.ts"
+
+  // Use platform-specific bunfs root path based on target OS
+  const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
+  const workerRelativePath = path.relative(dir, parserWorker).replaceAll("\\", "/")
 
   await Bun.build({
     conditions: ["browser"],
@@ -107,17 +173,23 @@ for (const [os, arch] of targets) {
     plugins: [solidPlugin],
     sourcemap: "external",
     compile: {
-      target: `bun-${os}-${arch}` as any,
+      autoloadBunfig: false,
+      autoloadDotenv: false,
+      //@ts-ignore (bun types aren't up to date)
+      autoloadTsconfig: true,
+      autoloadPackageJson: true,
+      target: name.replace(pkg.name, "bun") as any,
       outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, `--env-file=""`, `--`],
+      execArgv: [`--user-agent=opencode/${Script.version}`, "--"],
       windows: {},
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],
     define: {
       OPENCODE_VERSION: `'${Script.version}'`,
-      OTUI_TREE_SITTER_WORKER_PATH: "/$bunfs/root/" + path.relative(dir, parserWorker),
+      OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,
+      OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
     },
   })
 
@@ -127,8 +199,8 @@ for (const [os, arch] of targets) {
       {
         name,
         version: Script.version,
-        os: [os === "windows" ? "win32" : os],
-        cpu: [arch],
+        os: [item.os],
+        cpu: [item.arch],
       },
       null,
       2,

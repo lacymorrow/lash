@@ -8,6 +8,7 @@ import styles from "./provider-section.module.css"
 const PROVIDERS = [
   { name: "OpenAI", key: "openai", prefix: "sk-" },
   { name: "Anthropic", key: "anthropic", prefix: "sk-ant-" },
+  { name: "Google Gemini", key: "google", prefix: "AI" },
 ] as const
 
 type Provider = (typeof PROVIDERS)[number]
@@ -22,7 +23,9 @@ const removeProvider = action(async (form: FormData) => {
   if (!provider) return { error: "Provider is required" }
   const workspaceID = form.get("workspaceID")?.toString()
   if (!workspaceID) return { error: "Workspace ID is required" }
-  return json(await withActor(() => Provider.remove({ provider }), workspaceID), { revalidate: listProviders.key })
+  return json(await withActor(() => Provider.remove({ provider }), workspaceID), {
+    revalidate: listProviders.key,
+  })
 }, "provider.remove")
 
 const saveProvider = action(async (form: FormData) => {

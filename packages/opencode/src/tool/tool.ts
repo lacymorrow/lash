@@ -1,9 +1,15 @@
 import z from "zod"
 import type { MessageV2 } from "../session/message-v2"
+import type { Agent } from "../agent/agent"
+import type { PermissionNext } from "../permission/next"
 
 export namespace Tool {
   interface Metadata {
     [key: string]: any
+  }
+
+  export interface InitContext {
+    agent?: Agent.Info
   }
 
   export type Context<M extends Metadata = Metadata> = {
@@ -14,10 +20,11 @@ export namespace Tool {
     callID?: string
     extra?: { [key: string]: any }
     metadata(input: { title?: string; metadata?: M }): void
+    ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">): Promise<void>
   }
   export interface Info<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
     id: string
-    init: () => Promise<{
+    init: (ctx?: InitContext) => Promise<{
       description: string
       parameters: Parameters
       execute(
@@ -29,6 +36,7 @@ export namespace Tool {
         output: string
         attachments?: MessageV2.FilePart[]
       }>
+      formatValidationError?(error: z.ZodError): string
     }>
   }
 
@@ -41,11 +49,21 @@ export namespace Tool {
   ): Info<Parameters, Result> {
     return {
       id,
-      init: async () => {
-        const toolInfo = init instanceof Function ? await init() : init
+      init: async (ctx) => {
+        const toolInfo = init instanceof Function ? await init(ctx) : init
         const execute = toolInfo.execute
         toolInfo.execute = (args, ctx) => {
-          toolInfo.parameters.parse(args)
+          try {
+            toolInfo.parameters.parse(args)
+          } catch (error) {
+            if (error instanceof z.ZodError && toolInfo.formatValidationError) {
+              throw new Error(toolInfo.formatValidationError(error), { cause: error })
+            }
+            throw new Error(
+              `The ${id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
+              { cause: error },
+            )
+          }
           return execute(args, ctx)
         }
         return toolInfo
