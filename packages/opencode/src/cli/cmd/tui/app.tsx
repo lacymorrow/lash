@@ -3,10 +3,15 @@ import { Clipboard } from "@tui/util/clipboard"
 import { TextAttributes } from "@opentui/core"
 import { RouteProvider, useRoute } from "@tui/context/route"
 import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMount, batch, Show, on } from "solid-js"
-import { Installation } from "@/installation"
-import { Flag } from "@/flag/flag"
+import { createStore } from "solid-js/store"
+import { PromptRefProvider, usePromptRef } from "./context/prompt"
+import { Instance } from "@/project/instance"
+import { Plugin as PluginSystem } from "@/plugin"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderList } from "@tui/component/dialog-provider"
+import { PluginProvider, PluginContextState } from "./context/plugin"
+import { Installation } from "@/installation"
+import { Flag } from "@/flag/flag"
 import { SDKProvider, useSDK } from "@tui/context/sdk"
 import { SyncProvider, useSync } from "@tui/context/sync"
 import { LocalProvider, useLocal } from "@tui/context/local"
@@ -35,7 +40,6 @@ import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
-import { PromptRefProvider, usePromptRef } from "./context/prompt"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -181,6 +185,52 @@ function App() {
   const sync = useSync()
   const exit = useExit()
   const promptRef = usePromptRef()
+
+  const [pluginState, setPluginState] = createStore<PluginContextState>({
+    commands: [],
+    status: [],
+  })
+  const instance = Instance.current
+
+  createEffect(async () => {
+    // If instance context is available (it should be during render), use it
+    // otherwise fallback to just running (though it might fail if plugin needs context)
+    try {
+      if (instance) {
+        await Instance.run(instance, async () => {
+          console.log("Triggering plugin hooks...")
+          const outCmd = { commands: [] }
+          const outStatus = { components: [] }
+
+          await Promise.all([
+            PluginSystem.trigger("ui.command", { local, dialog, theme: { theme, mode, setMode } }, outCmd),
+            PluginSystem.trigger("ui.status", { local, dialog, theme: { theme, mode, setMode } }, outStatus),
+          ])
+
+          setPluginState({
+            commands: outCmd.commands,
+            status: outStatus.components,
+          })
+        })
+      } else {
+        console.log("Triggering plugin hooks (no instance)...")
+        const outCmd = { commands: [] }
+        const outStatus = { components: [] }
+
+        await Promise.all([
+          PluginSystem.trigger("ui.command", { local, dialog, theme: { theme, mode, setMode } }, outCmd),
+          PluginSystem.trigger("ui.status", { local, dialog, theme: { theme, mode, setMode } }, outStatus),
+        ])
+
+        setPluginState({
+          commands: outCmd.commands,
+          status: outStatus.components,
+        })
+      }
+    } catch (err) {
+      console.error("Error loading plugin commands:", err)
+    }
+  })
 
   // Wire up console copy-to-clipboard via opentui's onCopySelection callback
   renderer.console.onCopySelection = async (text: string) => {
@@ -442,7 +492,7 @@ function App() {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => {})
+        open("https://opencode.ai/docs").catch(() => { })
         dialog.clear()
       },
       category: "System",
@@ -451,7 +501,7 @@ function App() {
       title: "Open WebUI",
       value: "webui.open",
       onSelect: () => {
-        open(sdk.url).catch(() => {})
+        open(sdk.url).catch(() => { })
         dialog.clear()
       },
       category: "System",
@@ -524,6 +574,7 @@ function App() {
         dialog.clear()
       },
     },
+    ...pluginState.commands,
   ])
 
   createEffect(() => {
@@ -634,14 +685,16 @@ function App() {
         }
       }}
     >
-      <Switch>
-        <Match when={route.data.type === "home"}>
-          <Home />
-        </Match>
-        <Match when={route.data.type === "session"}>
-          <Session />
-        </Match>
-      </Switch>
+      <PluginProvider value={() => pluginState}>
+        <Switch>
+          <Match when={route.data.type === "home"}>
+            <Home />
+          </Match>
+          <Match when={route.data.type === "session"}>
+            <Session />
+          </Match>
+        </Switch>
+      </PluginProvider>
     </box>
   )
 }

@@ -1,5 +1,5 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
-import { createMemo, Match, onMount, Show, Switch } from "solid-js"
+import { createMemo, Match, onMount, Show, Switch, For } from "solid-js"
 import { useTheme } from "@tui/context/theme"
 import { Logo } from "../component/logo"
 import { DidYouKnow, randomizeTip } from "../component/did-you-know"
@@ -13,6 +13,7 @@ import { usePromptRef } from "../context/prompt"
 import { Installation } from "@/installation"
 import { useKV } from "../context/kv"
 import { useCommandDialog } from "../component/dialog-command"
+import { usePlugin } from "../context/plugin"
 
 // TODO: what is the best way to do this?
 let once = false
@@ -89,6 +90,7 @@ export function Home() {
     }
   })
   const directory = useDirectory()
+  const plugin = usePlugin()
 
   return (
     <>
@@ -112,6 +114,7 @@ export function Home() {
       </Show>
       <box paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0} gap={2}>
         <text fg={theme.textMuted}>{directory()}</text>
+        <For each={plugin().status}>{(Item) => <Item />}</For>
         <box gap={1} flexDirection="row" flexShrink={0}>
           <Show when={mcp()}>
             <text fg={theme.text}>

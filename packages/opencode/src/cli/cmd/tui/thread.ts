@@ -7,6 +7,7 @@ import { UI } from "@/cli/ui"
 import { iife } from "@/util/iife"
 import { Log } from "@/util/log"
 import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
+import { Instance } from "@/project/instance"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -88,22 +89,26 @@ export const TuiThreadCommand = cmd({
       return piped ? piped + "\n" + args.prompt : args.prompt
     })
 
-    const tuiPromise = tui({
-      url: server.url,
-      args: {
-        continue: args.continue,
-        sessionID: args.session,
-        agent: args.agent,
-        model: args.model,
-        prompt,
-      },
-      onExit: async () => {
-        await client.call("shutdown", undefined)
-      },
+    const tuiPromise = Instance.provide({
+      directory: cwd,
+      fn: () =>
+        tui({
+          url: server.url,
+          args: {
+            continue: args.continue,
+            sessionID: args.session,
+            agent: args.agent,
+            model: args.model,
+            prompt,
+          },
+          onExit: async () => {
+            await client.call("shutdown", undefined)
+          },
+        }),
     })
 
     setTimeout(() => {
-      client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+      client.call("checkUpgrade", { directory: cwd }).catch(() => { })
     }, 1000)
 
     await tuiPromise

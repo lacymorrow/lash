@@ -2,7 +2,7 @@ import type { Hooks, PluginInput, Plugin as PluginInstance } from "@opencode-ai/
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "../../../sdk/js/src/client.js"
 import { Server } from "../server/server"
 import { BunProc } from "../bun"
 import { Instance } from "../project/instance"
@@ -10,8 +10,6 @@ import { Flag } from "../flag/flag"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
-
-  const BUILTIN = ["opencode-copilot-auth@0.0.9", "opencode-anthropic-auth@0.0.5", "@lash-cli/core"]
 
   const state = Instance.state(async () => {
     const client = createOpencodeClient({
@@ -26,43 +24,25 @@ export namespace Plugin {
       project: Instance.project,
       worktree: Instance.worktree,
       directory: Instance.directory,
-      serverUrl: Server.url(),
       $: Bun.$,
     }
     const plugins = [...(config.plugin ?? [])]
     if (!Flag.OPENCODE_DISABLE_DEFAULT_PLUGINS) {
-      plugins.push(...BUILTIN)
+      plugins.push("opencode-copilot-auth@0.0.4")
+      plugins.push("opencode-anthropic-auth@0.0.2")
     }
     for (let plugin of plugins) {
       log.info("loading plugin", { path: plugin })
-      if (!plugin.startsWith("file://") && plugin !== "@lash-cli/core") {
+      if (!plugin.startsWith("file://")) {
         const lastAtIndex = plugin.lastIndexOf("@")
         const pkg = lastAtIndex > 0 ? plugin.substring(0, lastAtIndex) : plugin
         const version = lastAtIndex > 0 ? plugin.substring(lastAtIndex + 1) : "latest"
-        const builtin = BUILTIN.some((x) => x.startsWith(pkg + "@"))
-        plugin = await BunProc.install(pkg, version).catch((err) => {
-          if (builtin) return ""
-          throw err
-        })
-        if (!plugin) continue
+        plugin = await BunProc.install(pkg, version)
       }
       const mod = await import(plugin)
-      // Prevent duplicate initialization when plugins export the same function
-      // as both a named export and default export (e.g., `export const X` and `export default X`).
-      // Object.entries(mod) would return both entries pointing to the same function reference.
-      const seen = new Set<PluginInstance>()
-      for (const [name, fn] of Object.entries<PluginInstance>(mod)) {
-        if (typeof fn !== "function") continue
-        if (seen.has(fn)) continue
-        seen.add(fn)
-        try {
-          log.info(`initializing plugin export: ${name} from ${plugin}`)
-          const init = await fn(input)
-          log.info(`initialized plugin export: ${name} from ${plugin}`)
-          hooks.push(init)
-        } catch (e) {
-          log.error(`failed to initialize plugin export: ${name} from ${plugin}`, e)
-        }
+      for (const [_name, fn] of Object.entries<PluginInstance>(mod)) {
+        const init = await fn(input)
+        hooks.push(init)
       }
     }
 
@@ -97,7 +77,6 @@ export namespace Plugin {
     const hooks = await state().then((x) => x.hooks)
     const config = await Config.get()
     for (const hook of hooks) {
-      // @ts-expect-error this is because we haven't moved plugin to sdk v2
       await hook.config?.(config)
     }
     Bus.subscribeAll(async (input) => {

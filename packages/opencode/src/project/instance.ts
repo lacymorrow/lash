@@ -5,15 +5,21 @@ import { State } from "./state"
 import { iife } from "@/util/iife"
 import { GlobalBus } from "@/bus/global"
 
-interface Context {
+export interface InstanceContext {
   directory: string
   worktree: string
   project: Project.Info
 }
-const context = Context.create<Context>("instance")
-const cache = new Map<string, Promise<Context>>()
+const context = Context.create<InstanceContext>("instance")
+const cache = new Map<string, Promise<InstanceContext>>()
 
 export const Instance = {
+  get current() {
+    return context.use()
+  },
+  run<R>(ctx: InstanceContext, fn: () => R) {
+    return context.provide(ctx, fn)
+  },
   async provide<R>(input: { directory: string; init?: () => Promise<any>; fn: () => R }): Promise<R> {
     let existing = cache.get(input.directory)
     if (!existing) {
@@ -66,7 +72,7 @@ export const Instance = {
   async disposeAll() {
     Log.Default.info("disposing all instances")
     for (const [_key, value] of cache) {
-      const awaited = await value.catch(() => {})
+      const awaited = await value.catch(() => { })
       if (awaited) {
         await context.provide(await value, async () => {
           await Instance.dispose()
