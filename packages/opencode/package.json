@@ -77,7 +77,6 @@
     "@octokit/rest": "catalog:",
     "@openauthjs/openauth": "catalog:",
     "@opencode-ai/plugin": "workspace:*",
-    "@lash-cli/core": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/sdk": "workspace:*",
     "@opencode-ai/util": "workspace:*",

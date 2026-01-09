@@ -486,6 +486,7 @@ export function Prompt(props: PromptProps) {
   })
 
   async function submit() {
+    console.log("Submit called", { disabled: props.disabled, autocomplete: autocomplete?.visible, input: store.prompt.input })
     if (props.disabled) return
     if (autocomplete?.visible) return
     if (!store.prompt.input) return
