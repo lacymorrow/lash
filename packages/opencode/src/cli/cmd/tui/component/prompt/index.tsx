@@ -167,7 +167,7 @@ export function Prompt(props: PromptProps) {
         title: "Submit prompt",
         value: "prompt.submit",
         disabled: !store.prompt.input,
-        keybind: "input_submit",
+        // keybind: "input_submit",
         category: "Prompt",
         onSelect: (dialog) => {
           if (!input.focused) return
@@ -486,7 +486,11 @@ export function Prompt(props: PromptProps) {
   })
 
   async function submit() {
-    console.log("Submit called", { disabled: props.disabled, autocomplete: autocomplete?.visible, input: store.prompt.input })
+    console.log("Submit called!", {
+      disabled: props.disabled,
+      autocompleteVisible: autocomplete?.visible,
+      input: store.prompt.input?.length
+    })
     if (props.disabled) return
     if (autocomplete?.visible) return
     if (!store.prompt.input) return
@@ -770,12 +774,26 @@ export function Prompt(props: PromptProps) {
               maxHeight={6}
               onContentChange={() => {
                 const value = input.plainText
+                console.log("Prompt input:", value)
                 setStore("prompt", "input", value)
                 autocomplete.onInput(value)
                 syncExtmarksWithPromptParts()
               }}
               keyBindings={textareaKeybindings()}
+              onAction={(action) => {
+                console.log("Prompt onAction:", action)
+                if (action === "submit") {
+                  submit()
+                  return
+                }
+              }}
               onKeyDown={async (e) => {
+                console.log("Prompt onKeyDown:", e.name)
+                if (e.name === "return" || e.name === "enter") {
+                  e.preventDefault()
+                  submit()
+                  return
+                }
                 if (props.disabled) {
                   e.preventDefault()
                   return

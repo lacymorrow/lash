@@ -287,7 +287,6 @@
         "@clack/prompts": "1.0.0-alpha.1",
         "@hono/standard-validator": "0.1.5",
         "@hono/zod-validator": "catalog:",
-        "@lash-cli/core": "workspace:*",
         "@modelcontextprotocol/sdk": "1.25.2",
         "@octokit/graphql": "9.0.2",
         "@octokit/rest": "catalog:",
