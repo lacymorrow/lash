@@ -168,6 +168,15 @@ export default {
       },
     },
     {
+      filetype: "yaml",
+      wasm: "https://github.com/tree-sitter-grammars/tree-sitter-yaml/releases/download/v0.7.2/tree-sitter-yaml.wasm",
+      queries: {
+        highlights: [
+          "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/yaml/highlights.scm",
+        ],
+      },
+    },
+    {
       filetype: "haskell",
       wasm: "https://github.com/tree-sitter/tree-sitter-haskell/releases/download/v0.23.1/tree-sitter-haskell.wasm",
       queries: {
@@ -209,6 +218,34 @@ export default {
       queries: {
         highlights: [
           "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/clojure/highlights.scm",
+        ],
+      },
+    },
+    {
+      filetype: "swift",
+      wasm: "https://github.com/alex-pinkus/tree-sitter-swift/releases/download/0.7.1/tree-sitter-swift.wasm",
+      queries: {
+        highlights: [
+          // NOTE: Using parser repo queries instead of nvim-treesitter due to incompatible #lua-match? predicates
+          // "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/highlights.scm
+          "https://raw.githubusercontent.com/alex-pinkus/tree-sitter-swift/main/queries/highlights.scm",
+        ],
+        locals: [
+          "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/swift/locals.scm",
+        ],
+      },
+    },
+    {
+      filetype: "nix",
+      // TODO: Replace with official tree-sitter-nix WASM when published
+      // See: https://github.com/nix-community/tree-sitter-nix/issues/66
+      wasm: "https://github.com/ast-grep/ast-grep.github.io/raw/40b84530640aa83a0d34a20a2b0623d7b8e5ea97/website/public/parsers/tree-sitter-nix.wasm",
+      queries: {
+        highlights: [
+          "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/nix/highlights.scm",
+        ],
+        locals: [
+          "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/nix/locals.scm",
         ],
       },
     },

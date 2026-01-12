@@ -2,14 +2,18 @@ import z from "zod"
 import * as path from "path"
 import { Tool } from "./tool"
 import { LSP } from "../lsp"
-import { Permission } from "../permission"
+import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
 import { Bus } from "../bus"
 import { File } from "../file"
 import { FileTime } from "../file/time"
 import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
-import { Agent } from "../agent/agent"
+import { trimDiff } from "./edit"
+import { assertExternalDirectory } from "./external-directory"
+
+const MAX_DIAGNOSTICS_PER_FILE = 20
+const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const WriteTool = Tool.define("write", {
   description: DESCRIPTION,
@@ -19,28 +23,23 @@ export const WriteTool = Tool.define("write", {
   }),
   async execute(params, ctx) {
     const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
-    if (!Filesystem.contains(Instance.directory, filepath)) {
-      throw new Error(`File ${filepath} is not in the current working directory`)
-    }
+    await assertExternalDirectory(ctx, filepath)
 
     const file = Bun.file(filepath)
     const exists = await file.exists()
+    const contentOld = exists ? await file.text() : ""
     if (exists) await FileTime.assert(ctx.sessionID, filepath)
 
-    const agent = await Agent.get(ctx.agent)
-    if (agent.permission.edit === "ask")
-      await Permission.ask({
-        type: "write",
-        sessionID: ctx.sessionID,
-        messageID: ctx.messageID,
-        callID: ctx.callID,
-        title: exists ? "Overwrite this file: " + filepath : "Create new file: " + filepath,
-        metadata: {
-          filePath: filepath,
-          content: params.content,
-          exists,
-        },
-      })
+    const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
+    await ctx.ask({
+      permission: "edit",
+      patterns: [path.relative(Instance.worktree, filepath)],
+      always: ["*"],
+      metadata: {
+        filepath,
+        diff,
+      },
+    })
 
     await Bun.write(filepath, params.content)
     await Bus.publish(File.Event.Edited, {
@@ -51,13 +50,21 @@ export const WriteTool = Tool.define("write", {
     let output = ""
     await LSP.touchFile(filepath, true)
     const diagnostics = await LSP.diagnostics()
+    const normalizedFilepath = Filesystem.normalizePath(filepath)
+    let projectDiagnosticsCount = 0
     for (const [file, issues] of Object.entries(diagnostics)) {
-      if (issues.length === 0) continue
-      if (file === filepath) {
-        output += `\nThis file has errors, please fix\n<file_diagnostics>\n${issues.map(LSP.Diagnostic.pretty).join("\n")}\n</file_diagnostics>\n`
+      const errors = issues.filter((item) => item.severity === 1)
+      if (errors.length === 0) continue
+      const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
+      const suffix =
+        errors.length > MAX_DIAGNOSTICS_PER_FILE ? `\n... and ${errors.length - MAX_DIAGNOSTICS_PER_FILE} more` : ""
+      if (file === normalizedFilepath) {
+        output += `\nThis file has errors, please fix\n<file_diagnostics>\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</file_diagnostics>\n`
         continue
       }
-      output += `\n<project_diagnostics>\n${file}\n${issues.map(LSP.Diagnostic.pretty).join("\n")}\n</project_diagnostics>\n`
+      if (projectDiagnosticsCount >= MAX_PROJECT_DIAGNOSTICS_FILES) continue
+      projectDiagnosticsCount++
+      output += `\n<project_diagnostics>\n${file}\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</project_diagnostics>\n`
     }
 
     return {

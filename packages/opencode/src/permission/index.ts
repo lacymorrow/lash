@@ -1,5 +1,6 @@
+import { BusEvent } from "@/bus/bus-event"
+import { Bus } from "@/bus"
 import z from "zod"
-import { Bus } from "../bus"
 import { Log } from "../util/log"
 import { Identifier } from "../id/id"
 import { Plugin } from "../plugin"
@@ -26,7 +27,7 @@ export namespace Permission {
       sessionID: z.string(),
       messageID: z.string(),
       callID: z.string().optional(),
-      title: z.string(),
+      message: z.string(),
       metadata: z.record(z.string(), z.any()),
       time: z.object({
         created: z.number(),
@@ -38,8 +39,8 @@ export namespace Permission {
   export type Info = z.infer<typeof Info>
 
   export const Event = {
-    Updated: Bus.event("permission.updated", Info),
-    Replied: Bus.event(
+    Updated: BusEvent.define("permission.updated", Info),
+    Replied: BusEvent.define(
       "permission.replied",
       z.object({
         sessionID: z.string(),
@@ -81,9 +82,24 @@ export namespace Permission {
     },
   )
 
+  export function pending() {
+    return state().pending
+  }
+
+  export function list() {
+    const { pending } = state()
+    const result: Info[] = []
+    for (const items of Object.values(pending)) {
+      for (const item of Object.values(items)) {
+        result.push(item.info)
+      }
+    }
+    return result.sort((a, b) => a.id.localeCompare(b.id))
+  }
+
   export async function ask(input: {
     type: Info["type"]
-    title: Info["title"]
+    message: Info["message"]
     pattern?: Info["pattern"]
     callID?: Info["callID"]
     sessionID: Info["sessionID"]
@@ -107,7 +123,7 @@ export namespace Permission {
       sessionID: input.sessionID,
       messageID: input.messageID,
       callID: input.callID,
-      title: input.title,
+      message: input.message,
       metadata: input.metadata,
       time: {
         created: Date.now(),
@@ -166,7 +182,11 @@ export namespace Permission {
       for (const item of Object.values(items)) {
         const itemKeys = toKeys(item.info.pattern, item.info.type)
         if (covered(itemKeys, approved[input.sessionID])) {
-          respond({ sessionID: item.info.sessionID, permissionID: item.info.id, response: input.response })
+          respond({
+            sessionID: item.info.sessionID,
+            permissionID: item.info.id,
+            response: input.response,
+          })
         }
       }
     }
@@ -178,8 +198,13 @@ export namespace Permission {
       public readonly permissionID: string,
       public readonly toolCallID?: string,
       public readonly metadata?: Record<string, any>,
+      public readonly reason?: string,
     ) {
-      super(`The user rejected permission to use this specific tool call. You may try again with different parameters.`)
+      super(
+        reason !== undefined
+          ? reason
+          : `The user rejected permission to use this specific tool call. You may try again with different parameters.`,
+      )
     }
   }
 }

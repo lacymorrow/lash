@@ -79,19 +79,20 @@ export default function Home() {
               <strong>LSP enabled</strong> Automatically loads the right LSPs for the LLM
             </li>
             <li>
-              <strong>opencode zen</strong> A <a href="/docs/zen">curated list of models</a>{" "}
-              provided by opencode <label>New</label>
+              <strong>opencode zen</strong> A <a href="/docs/zen">curated list of models</a> provided by opencode{" "}
+              <label>New</label>
             </li>
             <li>
               <strong>Multi-session</strong> Start multiple agents in parallel on the same project
             </li>
             <li>
-              <strong>Shareable links</strong> Share a link to any sessions for reference or to
-              debug
+              <strong>Shareable links</strong> Share a link to any sessions for reference or to debug
             </li>
             <li>
-              <strong>Claude Pro</strong> Log in with Anthropic to use your Claude Pro or Max
-              account
+              <strong>Claude Pro</strong> Log in with Anthropic to use your Claude Pro or Max account
+            </li>
+            <li>
+              <strong>ChatGPT Plus/Pro</strong> Log in with OpenAI to use your ChatGPT Plus or Pro account
             </li>
             <li>
               <strong>Use any model</strong> Supports 75+ LLM providers through{" "}
@@ -153,7 +154,7 @@ export default function Home() {
             <a href="https://x.com/opencode">X.com</a>
           </div>
           <div data-slot="cell">
-            <a href="https://github.com/sst/opencode">GitHub</a>
+            <a href="https://github.com/anomalyco/opencode">GitHub</a>
           </div>
           <div data-slot="cell">
             <a href="https://opencode.ai/discord">Discord</a>
