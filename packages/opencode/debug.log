@@ -1,0 +1,14 @@
+[2026-01-13T18:42:58.846Z] DEBUG: TuiThreadCommand handler started
+[2026-01-13T18:42:58.853Z] DEBUG: Calling tui()
+[2026-01-13T20:05:18.109Z] DEBUG: TuiThreadCommand handler started
+[2026-01-13T20:05:18.132Z] DEBUG: Calling tui()
+[2026-01-13T20:05:18.133Z] DEBUG: tui function promise started
+[2026-01-13T20:05:18.133Z] DEBUG: calling getTerminalBackgroundColor
+[2026-01-13T20:05:18.210Z] DEBUG: getTerminalBackgroundColor resolved: light
+[2026-01-13T21:45:40.836Z] DEBUG: TuiThreadCommand handler started
+[2026-01-13T21:45:40.959Z] DEBUG: Calling tui()
+[2026-01-13T21:45:40.963Z] DEBUG: tui function promise started
+[2026-01-13T21:45:40.963Z] DEBUG: calling getTerminalBackgroundColor
+[2026-01-13T21:45:41.382Z] DEBUG: getTerminalBackgroundColor resolved: light
+[2026-01-13T21:45:41.382Z] DEBUG: Calling render()
+[2026-01-13T21:45:41.464Z] DEBUG: Root component function executing
