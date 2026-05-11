@@ -2,8 +2,8 @@ import { TextareaRenderable, TextAttributes } from "@opentui/core"
 import { useTheme } from "../context/theme"
 import { useDialog, type DialogContext } from "./dialog"
 import { createStore } from "solid-js/store"
-import { onMount, Show, type JSX } from "solid-js"
-import { useKeyboard } from "@opentui/solid"
+import { onMount, Show } from "solid-js"
+import { useBindings } from "../keymap"
 
 export type DialogExportOptionsProps = {
   defaultFilename: string
@@ -33,41 +33,49 @@ export function DialogExportOptions(props: DialogExportOptionsProps) {
     active: "filename" as "filename" | "thinking" | "toolDetails" | "assistantMetadata" | "openWithoutSaving",
   })
 
-  useKeyboard((evt) => {
-    if (evt.name === "return") {
-      props.onConfirm?.({
-        filename: textarea.plainText,
-        thinking: store.thinking,
-        toolDetails: store.toolDetails,
-        assistantMetadata: store.assistantMetadata,
-        openWithoutSaving: store.openWithoutSaving,
-      })
-    }
-    if (evt.name === "tab") {
-      const order: Array<"filename" | "thinking" | "toolDetails" | "assistantMetadata" | "openWithoutSaving"> = [
-        "filename",
-        "thinking",
-        "toolDetails",
-        "assistantMetadata",
-        "openWithoutSaving",
-      ]
-      const currentIndex = order.indexOf(store.active)
-      const nextIndex = (currentIndex + 1) % order.length
-      setStore("active", order[nextIndex])
-      evt.preventDefault()
-    }
-    if (evt.name === "space") {
-      if (store.active === "thinking") setStore("thinking", !store.thinking)
-      if (store.active === "toolDetails") setStore("toolDetails", !store.toolDetails)
-      if (store.active === "assistantMetadata") setStore("assistantMetadata", !store.assistantMetadata)
-      if (store.active === "openWithoutSaving") setStore("openWithoutSaving", !store.openWithoutSaving)
-      evt.preventDefault()
-    }
-  })
+  useBindings(() => ({
+    bindings: [
+      {
+        key: "tab",
+        desc: "Next export option",
+        group: "Dialog",
+        cmd: () => {
+          const order: Array<"filename" | "thinking" | "toolDetails" | "assistantMetadata" | "openWithoutSaving"> = [
+            "filename",
+            "thinking",
+            "toolDetails",
+            "assistantMetadata",
+            "openWithoutSaving",
+          ]
+          const currentIndex = order.indexOf(store.active)
+          const nextIndex = (currentIndex + 1) % order.length
+          setStore("active", order[nextIndex])
+        },
+      },
+    ],
+  }))
+
+  useBindings(() => ({
+    enabled: store.active !== "filename",
+    bindings: [
+      {
+        key: "space",
+        desc: "Toggle export option",
+        group: "Dialog",
+        cmd: () => {
+          if (store.active === "thinking") setStore("thinking", !store.thinking)
+          if (store.active === "toolDetails") setStore("toolDetails", !store.toolDetails)
+          if (store.active === "assistantMetadata") setStore("assistantMetadata", !store.assistantMetadata)
+          if (store.active === "openWithoutSaving") setStore("openWithoutSaving", !store.openWithoutSaving)
+        },
+      },
+    ],
+  }))
 
   onMount(() => {
     dialog.setSize("medium")
     setTimeout(() => {
+      if (!textarea || textarea.isDestroyed) return
       textarea.focus()
     }, 1)
     textarea.gotoLineEnd()
@@ -79,7 +87,9 @@ export function DialogExportOptions(props: DialogExportOptionsProps) {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           Export Options
         </text>
-        <text fg={theme.textMuted}>esc</text>
+        <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
+          esc
+        </text>
       </box>
       <box gap={1}>
         <box>
@@ -96,10 +106,13 @@ export function DialogExportOptions(props: DialogExportOptionsProps) {
             })
           }}
           height={3}
-          keyBindings={[{ name: "return", action: "submit" }]}
-          ref={(val: TextareaRenderable) => (textarea = val)}
+          ref={(val: TextareaRenderable) => {
+            textarea = val
+            val.traits = { status: "FILENAME" }
+          }}
           initialValue={props.defaultFilename}
           placeholder="Enter filename"
+          placeholderColor={theme.textMuted}
           textColor={theme.text}
           focusedTextColor={theme.text}
           cursorColor={theme.text}
