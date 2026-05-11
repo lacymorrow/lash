@@ -9,7 +9,7 @@ import path from "path"
 import os from "os"
 import { Bus } from "@/bus"
 import { SessionStatus } from "@/session/status"
-import * as Log from "@/util/log"
+import * as Log from "@opencode-ai/core/util/log"
 import { Shell } from "@/shell/shell"
 import { getCwd, setCwd } from "./cwd"
 

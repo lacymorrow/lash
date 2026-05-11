@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { Instance } from "../../src/project/instance"
-import { Session } from "../../src/session"
+import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { ProviderID, ModelID } from "../../src/provider/schema"
 import { AppRuntime } from "../../src/effect/app-runtime"
-import { tmpdir } from "../fixture/fixture"
+import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
 function sessionCreate(input?: Session.CreateInput) {
   return AppRuntime.runPromise(Session.Service.use((svc) => svc.create(input)))
@@ -36,7 +35,7 @@ describe("session.prompt agent variant", () => {
         },
       })
 
-      await Instance.provide({
+      await provideTestInstance({
         directory: tmp.path,
         fn: async () => {
           const session = await sessionCreate({})

@@ -8,7 +8,7 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import path from "path"
 import os from "os"
-import z from "zod"
+import { Schema } from "effect"
 
 let currentCwd: string | null = null
 
@@ -18,8 +18,8 @@ let currentCwd: string | null = null
 export const CwdEvent = {
   Updated: BusEvent.define(
     "cwd.updated",
-    z.object({
-      cwd: z.string(),
+    Schema.Struct({
+      cwd: Schema.String,
     }),
   ),
 }

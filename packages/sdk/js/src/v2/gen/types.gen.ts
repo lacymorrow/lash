@@ -788,6 +788,7 @@ export type GlobalEvent = {
     | EventMessagePartDelta
     | EventPermissionAsked
     | EventPermissionReplied
+    | EventCwdUpdated
     | EventSessionDiff
     | EventSessionError
     | EventInstallationUpdated
@@ -2403,6 +2404,7 @@ export type EventPermissionReplied = {
 }
 
 export type EventCwdUpdated = {
+  id: string
   type: "cwd.updated"
   properties: {
     cwd: string

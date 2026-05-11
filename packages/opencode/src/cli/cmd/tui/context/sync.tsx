@@ -79,7 +79,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
       formatter: FormatterStatus[]
       vcs: VcsInfo | undefined
-      path: Path
+      path: Path & { cwd: string }
     }>({
       provider_next: {
         all: [],

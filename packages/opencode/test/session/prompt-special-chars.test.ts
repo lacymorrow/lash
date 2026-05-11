@@ -1,12 +1,11 @@
 import path from "path"
 import { describe, expect, test } from "bun:test"
 import { fileURLToPath } from "url"
-import { Instance } from "../../src/project/instance"
-import { Log } from "../../src/util"
-import { Session } from "../../src/session"
+import * as Log from "@opencode-ai/core/util/log"
+import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { AppRuntime } from "../../src/effect/app-runtime"
-import { tmpdir } from "../fixture/fixture"
+import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
 void Log.init({ print: false })
 
@@ -35,7 +34,7 @@ describe("session.prompt special characters", () => {
       },
     })
 
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await sessionCreate({})

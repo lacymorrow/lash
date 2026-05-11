@@ -49,14 +49,11 @@ import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { createFadeIn } from "../../util/signal"
-import { useTextareaKeybindings } from "../textarea-keybindings"
 import {
   useExecutionMode,
-  handleModeToggleKey,
   determineRouting,
   handleShellTabCompletion,
   shouldUseShellCompletion,
-  applyCompletionAtIndex,
   type CompletionCycleState,
 } from "@tui-integration"
 import { ExecutionMode } from "@shell-mode"
@@ -169,6 +166,7 @@ export function Prompt(props: PromptProps) {
   const keymap = useOpencodeKeymap()
   const agentShortcut = useCommandShortcut("agent.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
+  const modeToggleShortcut = useCommandShortcut("prompt.mode.toggle")
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const { theme, syntax } = useTheme()
@@ -1013,6 +1011,55 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled,
+    commands: [
+      {
+        name: "prompt.mode.toggle",
+        title: "Toggle execution mode",
+        category: "Prompt",
+        run: () => {
+          executionMode.toggleMode()
+        },
+      },
+    ],
+    bindings: [{ key: "ctrl+space", cmd: "prompt.mode.toggle" }],
+  }))
+
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: (() => {
+      cursorVersion()
+      return (
+        inputTarget() !== undefined &&
+        !props.disabled &&
+        !auto()?.visible &&
+        input !== undefined &&
+        shouldUseShellCompletion(store.mode, executionMode.mode())
+      )
+    })(),
+    bindings: [
+      {
+        key: "tab",
+        desc: "Shell tab completion",
+        group: "Prompt",
+        cmd: async () => {
+          const result = await handleShellTabCompletion({
+            input: input.plainText,
+            cursorPosition: input.cursorOffset,
+            cwd: sync.data.path.cwd || sync.data.path.directory || undefined,
+          })
+          if (result.applied) {
+            input.setText(result.newInput)
+            setStore("prompt", "input", result.newInput)
+            input.cursorOffset = result.newCursorPosition
+          }
+        },
+      },
+    ],
+  }))
+
   async function submit() {
     setWarpNotice(undefined)
 
@@ -1545,100 +1592,6 @@ export function Prompt(props: PromptProps) {
                   e.preventDefault()
                   return
                 }
-                // Handle mode toggle (ctrl+space) - cycles between shell/agent/auto
-                if (handleModeToggleKey(e, executionMode, keybind)) {
-                  e.preventDefault()
-                  return
-                }
-
-                // Check clipboard for images before terminal-handled paste runs.
-                // This helps terminals that forward Ctrl+V to the app; Windows
-                // Terminal 1.25+ usually handles Ctrl+V before this path.
-                if (keybind.match("input_paste", e)) {
-                  const content = await Clipboard.read()
-                  if (content?.mime.startsWith("image/")) {
-                    e.preventDefault()
-                    await pasteAttachment({
-                      filename: "clipboard",
-                      mime: content.mime,
-                      content: content.data,
-                    })
-                    return
-                  }
-                  // If no image, let the default paste behavior continue
-                }
-                if (keybind.match("input_clear", e) && store.prompt.input !== "") {
-                  input.clear()
-                  input.extmarks.clear()
-                  setStore("prompt", {
-                    input: "",
-                    parts: [],
-                  })
-                  setStore("extmarkToPartIndex", new Map())
-                  return
-                }
-                if (keybind.match("app_exit", e)) {
-                  if (store.prompt.input === "") {
-                    await exit()
-                    // Don't preventDefault - let textarea potentially handle the event
-                    e.preventDefault()
-                    return
-                  }
-                }
-                if (e.name === "!" && input.visualCursor.offset === 0) {
-                  setStore("placeholder", randomIndex(shell().length))
-                  setStore("mode", "shell")
-                  e.preventDefault()
-                  return
-                }
-                if (store.mode === "shell") {
-                  if ((e.name === "backspace" && input.visualCursor.offset === 0) || e.name === "escape") {
-                    setStore("mode", "normal")
-                    e.preventDefault()
-                    return
-                  }
-                }
-                if (store.mode === "normal") autocomplete.onKeyDown(e)
-                if (e.name === "tab" && !e.shift && !e.ctrl && !e.meta && !e.defaultPrevented && !autocomplete.visible) {
-                  if (shouldUseShellCompletion(store.mode, executionMode.mode())) {
-                    e.preventDefault()
-                    const result = await handleShellTabCompletion({
-                      input: input.plainText,
-                      cursorPosition: input.cursorOffset,
-                      cwd: sync.data.path.cwd || sync.data.path.directory || undefined,
-                    })
-                    if (result.applied) {
-                      input.setText(result.newInput)
-                      setStore("prompt", "input", result.newInput)
-                      input.cursorOffset = result.newCursorPosition
-                    }
-                    return
-                  }
-                }
-                if (!autocomplete.visible) {
-                  if (
-                    (keybind.match("history_previous", e) && input.cursorOffset === 0) ||
-                    (keybind.match("history_next", e) && input.cursorOffset === input.plainText.length)
-                  ) {
-                    const direction = keybind.match("history_previous", e) ? -1 : 1
-                    const item = history.move(direction, input.plainText)
-
-                    if (item) {
-                      input.setText(item.input)
-                      setStore("prompt", item)
-                      setStore("mode", item.mode ?? "normal")
-                      restoreExtmarksFromParts(item.parts)
-                      e.preventDefault()
-                      if (direction === -1) input.cursorOffset = 0
-                      if (direction === 1) input.cursorOffset = input.plainText.length
-                    }
-                    return
-                  }
-
-                  if (keybind.match("history_previous", e) && input.visualCursor.visualRow === 0) input.cursorOffset = 0
-                  if (keybind.match("history_next", e) && input.visualCursor.visualRow === input.height - 1)
-                    input.cursorOffset = input.plainText.length
-                }
               }}
               onSubmit={() => {
                 // IME: double-defer so the last composed character (e.g. Korean
@@ -1903,7 +1856,7 @@ export function Prompt(props: PromptProps) {
                     </Match>
                   </Switch>
                   <text fg={theme.text}>
-                    {keybind.print("mode_toggle")}{" "}
+                    {modeToggleShortcut()}{" "}
                     <span style={{ fg: modePrefixColor() }}>{executionMode.getModeDisplay().name}</span>
                   </text>
                   <text fg={theme.text}>

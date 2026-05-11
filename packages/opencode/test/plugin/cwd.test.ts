@@ -2,20 +2,17 @@ import { afterEach, describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
 import { getCwd, setCwd, resetCwd, CwdEvent } from "../../plugin/shell-mode/cwd"
-import { Instance } from "../../src/project/instance"
 import { Bus } from "../../src/bus"
-import { tmpdir } from "../fixture/fixture"
+import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 
 afterEach(async () => {
   resetCwd()
-  await Instance.disposeAll()
+  await disposeAllInstances()
 })
 
-// setCwd needs Instance context because it publishes a Bus event.
-// All tests use withInstance to satisfy that requirement.
 async function withInstance(fn: () => Promise<void>): Promise<void> {
   await using tmp = await tmpdir()
-  await Instance.provide({ directory: tmp.path, fn })
+  await provideTestInstance({ directory: tmp.path, fn })
 }
 
 describe("setCwd / getCwd — unit", () => {
@@ -70,7 +67,7 @@ describe("setCwd / getCwd — unit", () => {
 describe("getCwd default — LAC-742 regression", () => {
   test("defaults to Instance.directory before any setCwd", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         expect(getCwd()).toBe(tmp.path)
@@ -80,7 +77,7 @@ describe("getCwd default — LAC-742 regression", () => {
 
   test("resetCwd restores fallback to Instance.directory", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         setCwd("/tmp")
@@ -104,7 +101,7 @@ describe("tool path resolution — LAC-742 regression", () => {
 
   test("relative tool path resolves against updated cwd, not Instance.directory", async () => {
     await using tmp = await tmpdir()
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         expect(getCwd()).toBe(tmp.path)
@@ -122,7 +119,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await using tmp = await tmpdir()
     const received: string[] = []
 
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
@@ -143,7 +140,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await using tmp = await tmpdir()
     const received: string[] = []
 
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
@@ -165,7 +162,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await using tmp = await tmpdir()
     const received: string[] = []
 
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
