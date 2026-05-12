@@ -108,7 +108,7 @@
     "type": "git",
     "url": "https://github.com/anomalyco/opencode"
   },
-  "license": "MIT",
+  "license": "FSL-1.1-MIT",
   "prettier": {
     "semi": false,
     "printWidth": 120
