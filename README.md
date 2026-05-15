@@ -18,6 +18,20 @@
 
 AI-powered terminal assistant for software developers.
 
+## Why This Fork?
+
+This is a maintained fork of [anomalyco/opencode](https://github.com/anomalyco/opencode). We forked to extend OpenCode with shell-native features we need for our own workflows that haven't landed upstream yet:
+
+- **Shell mode** — a first-class execution mode (`ctrl+space` or `!` prefix) that runs commands in a live shell instead of routing through the AI, with a distinct color bar in the TUI prompt
+- **Working directory tracking** — `getCwd()` / `setCwd()` persists the shell cwd across commands; a sentinel in bash output propagates `cd` changes back to the UI footer
+- **Natural language detection** — automatically routes input to AI when it reads like a question or instruction, to shell when it reads like a command — no prefix needed in `auto` mode
+- **Double left border UI** — two side bars in the TUI prompt: outer bar = agent color, inner bar = execution mode color, using a row layout that keeps both bars at equal height
+- **Tab → shell autocomplete** — Tab triggers shell completion; Shift+Tab cycles agents (upstream maps Tab to agent cycle)
+- **`EventCwdUpdated` SDK type** — exposes working directory change events through the JS SDK
+- **Independent versioning** — lash uses `1.7.x` versioning and is published independently of upstream releases
+
+We keep the fork in sync with upstream (`git fetch upstream && git merge upstream/dev`) and document merge conflicts in [UPSTREAM_SYNC.md](./UPSTREAM_SYNC.md).
+
 ## Installation
 
 ### One-line install (Recommended)
