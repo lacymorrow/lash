@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import path from "node:path"
 import { and, Database, eq, isNull, lt, or, sql } from "@opencode-ai/console-core/drizzle/index.js"
 import { KeyTable } from "@opencode-ai/console-core/schema/key.sql.js"

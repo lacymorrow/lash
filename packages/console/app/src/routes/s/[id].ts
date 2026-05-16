@@ -1,4 +1,4 @@
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 
 async function handler(evt: APIEvent) {
   const req = evt.request.clone()

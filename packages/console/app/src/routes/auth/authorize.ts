@@ -1,4 +1,4 @@
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { AuthClient } from "~/context/auth"
 
 export async function GET(input: APIEvent) {

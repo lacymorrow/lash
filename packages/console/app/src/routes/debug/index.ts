@@ -1,4 +1,4 @@
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { json } from "@solidjs/router"
 import { Database } from "@opencode-ai/console-core/drizzle/index.js"
 import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"

@@ -9,8 +9,8 @@ import { Show, createMemo } from "solid-js"
 
 export default function () {
   const params = useParams()
-  const userInfo = createAsync(() => querySessionInfo(params.id))
-  const billingInfo = createAsync(() => queryBillingInfo(params.id))
+  const userInfo = createAsync(() => querySessionInfo(params.id!))
+  const billingInfo = createAsync(() => queryBillingInfo(params.id!))
   const createCheckoutUrlAction = useAction(createCheckoutUrl)
   const createCheckoutUrlSubmission = useSubmission(createCheckoutUrl)
 
@@ -41,7 +41,7 @@ export default function () {
                     disabled={createCheckoutUrlSubmission.pending}
                     onClick={async () => {
                       const baseUrl = window.location.href
-                      const checkoutUrl = await createCheckoutUrlAction(params.id, baseUrl, baseUrl)
+                      const checkoutUrl = await createCheckoutUrlAction(params.id!, baseUrl, baseUrl)
                       if (checkoutUrl) {
                         window.location.href = checkoutUrl
                       }

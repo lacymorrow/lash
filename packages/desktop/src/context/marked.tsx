@@ -5,23 +5,22 @@ import markedShiki from "marked-shiki"
 import { bundledLanguages, type BundledLanguage } from "shiki"
 
 function init(highlighter: ReturnType<typeof useShiki>) {
-  return marked.use(
-    markedShiki({
-      async highlight(code, lang) {
-        if (!(lang in bundledLanguages)) {
-          lang = "text"
-        }
-        if (!highlighter.getLoadedLanguages().includes(lang)) {
-          await highlighter.loadLanguage(lang as BundledLanguage)
-        }
-        return highlighter.codeToHtml(code, {
-          lang: lang || "text",
-          theme: "opencode",
-          tabindex: false,
-        })
-      },
-    }),
-  )
+  const ext = markedShiki({
+    async highlight(code, lang) {
+      if (!(lang in bundledLanguages)) {
+        lang = "text"
+      }
+      if (!highlighter.getLoadedLanguages().includes(lang)) {
+        await highlighter.loadLanguage(lang as BundledLanguage)
+      }
+      return highlighter.codeToHtml(code, {
+        lang: lang || "text",
+        theme: "opencode",
+        tabindex: false,
+      })
+    },
+  }) as Parameters<typeof marked.use>[0]
+  return marked.use(ext)
 }
 
 type MarkedContext = ReturnType<typeof init>

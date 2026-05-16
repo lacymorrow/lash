@@ -1,5 +1,5 @@
 import { Billing } from "@opencode-ai/console-core/billing.js"
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { and, Database, eq, sql } from "@opencode-ai/console-core/drizzle/index.js"
 import { BillingTable, PaymentTable } from "@opencode-ai/console-core/schema/billing.sql.js"
 import { Identifier } from "@opencode-ai/console-core/identifier.js"

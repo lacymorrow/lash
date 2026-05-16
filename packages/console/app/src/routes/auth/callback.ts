@@ -1,5 +1,5 @@
 import { redirect } from "@solidjs/router"
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { AuthClient } from "~/context/auth"
 import { useAuthSession } from "~/context/auth.session"
 

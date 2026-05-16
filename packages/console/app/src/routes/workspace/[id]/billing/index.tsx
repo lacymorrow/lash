@@ -7,7 +7,7 @@ import { querySessionInfo } from "../../common"
 
 export default function () {
   const params = useParams()
-  const userInfo = createAsync(() => querySessionInfo(params.id))
+  const userInfo = createAsync(() => querySessionInfo(params.id!))
 
   return (
     <div data-page="workspace-[id]">

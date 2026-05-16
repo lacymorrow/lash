@@ -48,7 +48,7 @@ const getBillingInfo = query(async (workspaceID: string) => {
 export function BillingSection() {
   const params = useParams()
   // ORIGINAL CODE - COMMENTED OUT FOR TESTING
-  const balanceInfo = createAsync(() => getBillingInfo(params.id))
+  const balanceInfo = createAsync(() => getBillingInfo(params.id!))
   const createCheckoutUrlAction = useAction(createCheckoutUrl)
   const createCheckoutUrlSubmission = useSubmission(createCheckoutUrl)
   const createSessionUrlAction = useAction(createSessionUrl)
@@ -157,7 +157,7 @@ export function BillingSection() {
                       disabled={createCheckoutUrlSubmission.pending}
                       onClick={async () => {
                         const baseUrl = window.location.href
-                        const checkoutUrl = await createCheckoutUrlAction(params.id, baseUrl, baseUrl)
+                        const checkoutUrl = await createCheckoutUrlAction(params.id!, baseUrl, baseUrl)
                         if (checkoutUrl) {
                           window.location.href = checkoutUrl
                         }
@@ -182,7 +182,7 @@ export function BillingSection() {
                 disabled={createSessionUrlSubmission.pending}
                 onClick={async () => {
                   const baseUrl = window.location.href
-                  const sessionUrl = await createSessionUrlAction(params.id, baseUrl)
+                  const sessionUrl = await createSessionUrlAction(params.id!, baseUrl)
                   if (sessionUrl) {
                     window.location.href = sessionUrl
                   }

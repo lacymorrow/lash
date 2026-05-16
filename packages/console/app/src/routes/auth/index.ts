@@ -3,7 +3,7 @@ import { and, Database, eq, isNull } from "@opencode-ai/console-core/drizzle/ind
 import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
 import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
 import { redirect } from "@solidjs/router"
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { withActor } from "~/context/auth.withActor"
 
 export async function GET(input: APIEvent) {

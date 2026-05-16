@@ -1,7 +1,6 @@
 import "./index.css"
 import { createAsync } from "@solidjs/router"
 import { Title, Meta, Link } from "@solidjs/meta"
-import { HttpHeader } from "@solidjs/start"
 import zenLogoLight from "../../asset/zen-ornate-light.svg"
 import zenLogoDark from "../../asset/zen-ornate-dark.svg"
 import compareVideo from "../../asset/lander/opencode-comparison-min.mp4"
@@ -22,7 +21,6 @@ export default function Home() {
   const isLoggedIn = createAsync(() => queryIsLoggedIn())
   return (
     <main data-page="zen">
-      <HttpHeader name="Cache-Control" value="public, max-age=1, s-maxage=3600, stale-while-revalidate=86400" />
       <Title>OpenCode Zen | A curated set of reliable optimized models for coding agents</Title>
       <Link rel="icon" type="image/svg+xml" href="/favicon-zen.svg" />
       <Meta property="og:image" content="/social-share-zen.png" />

@@ -1,4 +1,4 @@
-import type { APIEvent } from "@solidjs/start/server"
+import type { APIEvent } from "@solidjs/start"
 import { handler } from "~/routes/zen/handler"
 
 type Usage = {
