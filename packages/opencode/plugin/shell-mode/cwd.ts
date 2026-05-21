@@ -3,7 +3,7 @@
  * Tracks the current working directory independently from Instance.directory.
  */
 
-import { Instance } from "@/project/instance"
+import { context as instanceContext } from "@/project/instance-context"
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import path from "path"
@@ -30,7 +30,11 @@ export const CwdEvent = {
  */
 export function getCwd(): string {
   if (currentCwd === null) {
-    return Instance.directory
+    try {
+      return instanceContext.use().directory
+    } catch {
+      return process.cwd()
+    }
   }
   return currentCwd
 }
@@ -57,7 +61,11 @@ export function setCwd(dir: string): void {
 
   // Publish event if cwd changed
   if (changed) {
-    Bus.publish(CwdEvent.Updated, { cwd: resolved })
+    try {
+      void Bus.publish(instanceContext.use(), CwdEvent.Updated, { cwd: resolved })
+    } catch {
+      // No instance context available; skip publishing
+    }
   }
 }
 
