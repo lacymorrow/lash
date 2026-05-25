@@ -261,18 +261,21 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                   )
                 },
                 removeTab: (href: string) => {
-                  startTransition(() => {
-                    setStore(
-                      produce((tabs) => {
-                        const index = tabs.findIndex((t) => t.href === href)
-                        if (index === -1) return
-                        tabs.splice(index, 1)
-                        const nextTab = tabs[index] ?? tabs[tabs.length - 1]
-                        if (nextTab) navigate(nextTab.href)
-                        else navigate("/")
-                      }),
-                    )
-                  })
+                  let nextHref: string | undefined
+                  setStore(
+                    produce((tabs) => {
+                      const index = tabs.findIndex((t) => t.href === href)
+                      if (index === -1) return
+                      tabs.splice(index, 1)
+                      const nextTab = tabs[index] ?? tabs[tabs.length - 1]
+                      nextHref = nextTab ? nextTab.href : "/"
+                    }),
+                  )
+                  if (nextHref !== undefined) {
+                    startTransition(() => {
+                      navigate(nextHref!)
+                    })
+                  }
                 },
               }
 

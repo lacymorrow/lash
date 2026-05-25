@@ -1,6 +1,6 @@
 export * as Catalog from "./catalog"
 
-import { Context, Effect, HashMap, Layer, Option, Order, pipe, Schema, Array, Scope, Stream } from "effect"
+import { Context, Effect, HashMap, Layer, Option, Order, pipe, Schema, Array, Scope, Semaphore, Stream } from "effect"
 import { produce, type Draft } from "immer"
 import { ModelV2 } from "./model"
 import { PluginV2 } from "./plugin"
@@ -205,11 +205,16 @@ export const layer = Layer.effect(
       records = draft.records
     })
 
+    const rebuildSemaphore = Semaphore.makeUnsafe(1)
     const rebuild = Effect.fn("CatalogV2.rebuild")(function* () {
-      const draft = { records: HashMap.empty<ProviderV2.ID, ProviderRecord>(), data: [] as ProviderRecord[] }
-      for (const loader of loaders) loader.update(context(draft))
-      yield* plugin.trigger("catalog.transform", context(draft), {})
-      records = draft.records
+      yield* rebuildSemaphore.withPermits(1)(
+        Effect.gen(function* () {
+          const draft = { records: HashMap.empty<ProviderV2.ID, ProviderRecord>(), data: [] as ProviderRecord[] }
+          for (const loader of loaders) loader.update(context(draft))
+          yield* plugin.trigger("catalog.transform", context(draft), {})
+          records = draft.records
+        }),
+      )
     })
 
     yield* plugin.added().pipe(
