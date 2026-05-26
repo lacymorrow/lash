@@ -1049,7 +1049,7 @@ export function Prompt(props: PromptProps) {
           const result = await handleShellTabCompletion({
             input: input.plainText,
             cursorPosition: input.cursorOffset,
-            cwd: sync.data.path.cwd || sync.data.path.directory || undefined,
+            cwd: sync.data.path.cwd || sync.data.path.directory || sync.path.directory || undefined,
           })
           if (result.applied) {
             input.setText(result.newInput)
@@ -1466,11 +1466,11 @@ export function Prompt(props: PromptProps) {
     return local.agent.color(agent.name)
   })
 
-  // Shortened working directory for display in footer
+  // Fall back to sync.path: store path.{directory,home} stay empty until shell-mode emits cwd.updated, so without it the prompt is blank until the user first `cd`s.
   const shortenedWorkingDir = createMemo(() => {
-    const dir = sync.data.path.cwd || sync.data.path.directory
+    const dir = sync.data.path.cwd || sync.data.path.directory || sync.path.directory
     if (!dir) return ""
-    const home = sync.data.path.home || process.env.HOME || process.env.USERPROFILE || ""
+    const home = sync.data.path.home || sync.path.home || process.env.HOME || process.env.USERPROFILE || ""
     if (home && dir.startsWith(home)) {
       return "~" + dir.slice(home.length)
     }
