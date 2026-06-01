@@ -299,6 +299,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                 },
                 removeSessions: (input: SessionTabsRemovedDetail) => {
                   void startTransition(() => {
+                    let nextHref: string | undefined
                     setStore(
                       produce((tabs) => {
                         const sessionIDs = new Set(input.sessionIDs)
@@ -319,10 +320,12 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
 
                         if (!removedCurrent) return
                         const nextTab = tabs[currentIndex] ?? tabs[tabs.length - 1]
-                        if (nextTab) navigate(nextTab.href)
-                        else navigate("/")
+                        nextHref = nextTab ? nextTab.href : "/"
                       }),
                     )
+                    if (nextHref !== undefined) {
+                      navigate(nextHref)
+                    }
                   })
                 },
               }
