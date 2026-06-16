@@ -429,6 +429,7 @@ const lowerOptions = Effect.fn("OpenAIResponses.lowerOptions")(function* (reques
 
 const fromRequest = Effect.fn("OpenAIResponses.fromRequest")(function* (request: LLMRequest) {
   const generation = request.generation
+  const options = yield* lowerOptions(request)
   return {
     model: request.model.id,
     input: yield* lowerMessages(request),
@@ -438,7 +439,7 @@ const fromRequest = Effect.fn("OpenAIResponses.fromRequest")(function* (request:
     max_output_tokens: generation?.maxTokens,
     temperature: generation?.temperature,
     top_p: generation?.topP,
-    ...(yield* lowerOptions(request)),
+    ...options,
   }
 })
 
