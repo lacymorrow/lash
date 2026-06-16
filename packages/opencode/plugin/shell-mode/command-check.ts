@@ -5,7 +5,7 @@
  */
 
 import { Shell } from "@/shell/shell"
-import { which } from "@/util/which"
+import { which } from "@opencode-ai/core/util/which"
 import { spawn as nodeSpawn } from "node:child_process"
 import path from "path"
 
