@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
-import { ProviderV2, ModelID } from "@opencode-ai/core/provider"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 import { AppRuntime } from "../../src/effect/app-runtime"
 import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
@@ -43,7 +44,7 @@ describe("session.prompt agent variant", () => {
           const other = await sessionPrompt({
             sessionID: session.id,
             agent: "build",
-            model: { providerID: ProviderV2.ID.make("opencode"), modelID: ModelID.make("kimi-k2.5-free") },
+            model: { providerID: ProviderV2.ID.make("opencode"), modelID: ModelV2.ID.make("kimi-k2.5-free") },
             noReply: true,
             parts: [{ type: "text", text: "hello" }],
           })
@@ -58,7 +59,7 @@ describe("session.prompt agent variant", () => {
           })
           if (match.info.role !== "user") throw new Error("expected user message")
           expect(match.info.model.providerID).toEqual(ProviderV2.ID.make("openai"))
-          expect(match.info.model.modelID).toEqual(ModelID.make("gpt-5.2"))
+          expect(match.info.model.modelID).toEqual(ModelV2.ID.make("gpt-5.2"))
           expect(match.info.model.variant).toBe("xhigh")
 
           const override = await sessionPrompt({
