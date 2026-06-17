@@ -1,6 +1,6 @@
 import { createContext, useContext, type ParentProps } from "solid-js"
 import { useShiki } from "@/context"
-import { marked } from "marked"
+import { marked, type MarkedExtension } from "marked"
 import markedShiki from "marked-shiki"
 import { bundledLanguages, type BundledLanguage } from "shiki"
 
@@ -20,7 +20,7 @@ function init(highlighter: ReturnType<typeof useShiki>) {
           tabindex: false,
         })
       },
-    }),
+    }) as MarkedExtension,
   )
 }
 
