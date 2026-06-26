@@ -9,11 +9,13 @@ import path from "path"
 import os from "os"
 import { GlobalBus, type GlobalEvent } from "@/bus/global"
 import { SessionStatus } from "@/session/status"
-import * as Log from "@opencode-ai/core/util/log"
-import { Shell } from "@/shell/shell"
+import { Shell } from "@opencode-ai/core/shell"
 import { getCwd, setCwd } from "./cwd"
 
-const log = Log.create({ service: "session-shell" })
+const log = {
+  info: (...args: unknown[]) => console.log("[session-shell]", ...args),
+  error: (...args: unknown[]) => console.error("[session-shell]", ...args),
+}
 
 // Idle timeout before disposing shell (2 minutes)
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000

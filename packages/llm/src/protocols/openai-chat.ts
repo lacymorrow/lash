@@ -14,7 +14,7 @@ import {
   type TextPart,
   type ToolCallPart,
   type ToolDefinition,
-  type ToolResultContentPart,
+  type ToolContent,
 } from "../schema"
 import { isRecord, JsonObject, optionalArray, optionalNull, ProviderShared } from "./shared"
 import { OpenAIOptions } from "./utils/openai-options"
@@ -200,9 +200,7 @@ const lowerToolCall = (part: ToolCallPart): OpenAIChatAssistantToolCall => ({
   },
 })
 
-const lowerMedia = Effect.fn("OpenAIChat.lowerMedia")(function* (
-  part: Extract<MediaPart | ToolResultContentPart, { type: "media" }>,
-) {
+const lowerMedia = Effect.fn("OpenAIChat.lowerMedia")(function* (part: MediaPart) {
   const media = yield* ProviderShared.validateMedia("OpenAI Chat", part, IMAGE_MIMES)
   return { type: "image_url" as const, image_url: { url: media.dataUrl } }
 })
@@ -271,13 +269,15 @@ const lowerToolMessages = Effect.fn("OpenAIChat.lowerToolMessages")(function* (m
       messages.push({ role: "tool", tool_call_id: part.id, content: ProviderShared.toolResultText(part) })
       continue
     }
-    const content: ReadonlyArray<ToolResultContentPart> = part.result.value
+    const content: ReadonlyArray<ToolContent> = part.result.value
     const text = content.filter((item) => item.type === "text").map((item) => item.text)
     messages.push({ role: "tool", tool_call_id: part.id, content: text.join("\n") })
-    const media = content.filter(
-      (item): item is Extract<ToolResultContentPart, { type: "media" }> => item.type === "media",
+    const files = content.filter((item) => item.type === "file")
+    images.push(
+      ...(yield* Effect.forEach(files, (item) =>
+        lowerMedia({ type: "media", mediaType: item.mime, data: item.uri, filename: item.name }),
+      )),
     )
-    images.push(...(yield* Effect.forEach(media, lowerMedia)))
   }
   return { messages, images }
 })
@@ -411,7 +411,12 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
     if (delta?.reasoning_content)
       lifecycle = Lifecycle.reasoningDelta(lifecycle, events, "reasoning-0", delta.reasoning_content)
 
-    if (delta?.content) lifecycle = Lifecycle.textDelta(lifecycle, events, "text-0", delta.content)
+    if (delta?.content) {
+      lifecycle = Lifecycle.reasoningEnd(lifecycle, events, "reasoning-0")
+      lifecycle = Lifecycle.textDelta(lifecycle, events, "text-0", delta.content)
+    }
+
+    if (toolDeltas.length) lifecycle = Lifecycle.reasoningEnd(lifecycle, events, "reasoning-0")
 
     for (const tool of toolDeltas) {
       const result = ToolStream.appendOrStart(
