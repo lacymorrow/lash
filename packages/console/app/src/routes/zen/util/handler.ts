@@ -47,6 +47,7 @@ import { i18n, type Key } from "~/i18n"
 import { localeFromRequest } from "~/lib/language"
 import { createModelTpmLimiter } from "./modelTpmLimiter"
 import { createModelTpsLimiter } from "./modelTpsLimiter"
+import { createProviderBudgetTracker } from "./providerBudgetTracker"
 import { accumulateUsage, HOT_WORKSPACES } from "./usageBatcher"
 
 type ZenData = Awaited<ReturnType<typeof ZenData.list>>
@@ -104,6 +105,7 @@ export async function handler(
     const sessionId = input.request.headers.get("x-opencode-session") ?? ""
     const requestId = input.request.headers.get("x-opencode-request") ?? ""
     const ocClient = input.request.headers.get("x-opencode-client") ?? ""
+    const projectId = input.request.headers.get("x-opencode-project") ?? ""
     const userAgent = input.request.headers.get("user-agent") ?? ""
     logger.metric({
       is_stream: isStream,
@@ -132,6 +134,10 @@ export async function handler(
     const modelTpmLimits = await modelTpmLimiter?.check()
     const modelTpsLimiter = createModelTpsLimiter(modelInfo.providers)
     const modelTpsLimits = await modelTpsLimiter?.check()
+    const providerBudgetTracker = createProviderBudgetTracker(
+      modelInfo.providers.map((provider) => ({ ...zenData.providers[provider.id], ...provider })),
+    )
+    const providerBudget = await providerBudgetTracker?.check()
 
     const retriableRequest = async (retry: RetryOptions = { excludeProviders: [], retryCount: 0 }) => {
       const providerInfo = selectProvider(
@@ -145,6 +151,7 @@ export async function handler(
         stickyProvider,
         modelTpmLimits,
         modelTpsLimits,
+        providerBudget,
       )
       validateModelSettings(billingSource, authInfo)
       updateProviderKey(authInfo, providerInfo)
@@ -187,8 +194,18 @@ export async function handler(
         headers: (() => {
           const headers = new Headers(input.request.headers)
           providerInfo.modifyHeaders(headers, providerInfo.apiKey, stickyId)
-          Object.entries(providerInfo.headerMappings ?? {}).forEach(([k, v]) => {
-            headers.set(k, headers.get(v)!)
+          Object.entries(providerInfo.headerModifier ?? {}).forEach(([k, v]) => {
+            if (v === "$ip") return headers.set(k, ip)
+            if (v === "$caller") return headers.set(k, stickyId)
+            if (v === "$session") return headers.set(k, sessionId)
+            if (v === "$model") return headers.set(k, model)
+            if (v === "$request") return headers.set(k, requestId)
+            if (v === "$project") return headers.set(k, projectId)
+            if (v === "$workspace") {
+              if (authInfo?.workspaceID) headers.set(k, authInfo.workspaceID)
+              return
+            }
+            headers.set(k, v)
           })
           headers.delete("host")
           headers.delete("content-length")
@@ -200,6 +217,16 @@ export async function handler(
         })(),
         body: reqBody,
       })
+
+      if (providerInfo.id.startsWith("console.")) {
+        const resEndpointId = res.headers.get("x-opencode-endpoint-id")
+        const resEndpointModelId = res.headers.get("x-opencode-upstream-model-id")
+        if (resEndpointId && resEndpointModelId)
+          logger.metric({
+            provider: resEndpointId,
+            "provider.model": resEndpointModelId,
+          })
+      }
 
       if (res.status !== 200) {
         logger.metric({
@@ -257,6 +284,7 @@ export async function handler(
         const costInfo = calculateCost(modelInfo, usageInfo)
         await trialLimiter?.track(usageInfo)
         await modelTpmLimiter?.track(providerInfo.id, providerInfo.model, usageInfo)
+        await providerBudgetTracker?.track(providerInfo.id, providerInfo.budgetPriority, costInfo.totalCostInCent)
         await trackUsage(sessionId, billingSource, authInfo, modelInfo, providerInfo, usageInfo, costInfo)
         await reload(billingSource, authInfo, costInfo)
         json.cost = calculateOccurredCost(billingSource, costInfo)
@@ -317,6 +345,11 @@ export async function handler(
                     timestampLastByte,
                     usageInfo,
                   )
+                  await providerBudgetTracker?.track(
+                    providerInfo.id,
+                    providerInfo.budgetPriority,
+                    costInfo.totalCostInCent,
+                  )
                   await trackUsage(sessionId, billingSource, authInfo, modelInfo, providerInfo, usageInfo, costInfo)
                   await reload(billingSource, authInfo, costInfo)
                   const cost = calculateOccurredCost(billingSource, costInfo)
@@ -340,7 +373,7 @@ export async function handler(
               responseLength += value.length
               buffer += decoder.decode(value, { stream: true })
 
-              const parts = buffer.split(providerInfo.streamSeparator)
+              const parts = buffer.split(/\r\n\r\n|\n\n|\r\r/)
               buffer = parts.pop() ?? ""
 
               for (let part of parts) {
@@ -483,6 +516,12 @@ export async function handler(
     stickyProviderId: string | undefined,
     modelTpmLimits: Record<string, number> | undefined,
     modelTpsLimits: Record<string, { qualify: number; unqualify: number }> | undefined,
+    providerBudget:
+      | {
+          qualify: (providerId: string, priority: number) => boolean
+          prefer: (providerId: string, priority: number) => boolean
+        }
+      | undefined,
   ) {
     const modelProvider = (() => {
       // Byok is top priority b/c if user set their own API key, we should use it
@@ -505,6 +544,11 @@ export async function handler(
         const providers = allProviders
           .filter((provider) => provider.weight !== 0)
           .filter((provider) => !retry.excludeProviders.includes(provider.id))
+          .filter((provider) => {
+            if (provider.budgetPriority === undefined) return true
+            if (!providerBudget) return true
+            return providerBudget.qualify(provider.id, provider.budgetPriority)
+          })
           .filter((provider) => {
             if (!provider.tpmLimit) return true
             const usage = modelTpmLimits?.[`${provider.id}/${provider.model}`] ?? 0
@@ -540,15 +584,19 @@ export async function handler(
         const stickProvider = allProviders.find((provider) => provider.id === stickyProviderId)
         if (!stickProvider) return provider
 
-        // stick provider exists + selected provider is API type => use sticky provider
-        if (!provider.tpsGoal) return stickProvider
+        const preferBudgetProvider =
+          provider.budgetPriority !== undefined && providerBudget?.prefer(provider.id, provider.budgetPriority)
 
-        // stick provier exists + selected provider is GPU type + GPU not idle => use selected provider
-        const tps = modelTpsLimits?.[`${provider.id}/${provider.model}/${provider.tpsGoal}`] ?? {
-          qualify: 0,
-          unqualify: 0,
-        }
-        if (tps.qualify <= tps.unqualify * 3) return stickProvider
+        const preferTpsProvider = (() => {
+          if (!provider.tpsGoal) return false
+          const tps = modelTpsLimits?.[`${provider.id}/${provider.model}/${provider.tpsGoal}`] ?? {
+            qualify: 0,
+            unqualify: 0,
+          }
+          return tps.qualify > tps.unqualify * 3
+        })()
+
+        if (!preferBudgetProvider && !preferTpsProvider) return stickProvider
 
         return provider
       }
@@ -676,6 +724,7 @@ export async function handler(
     logger.metric({
       api_key: data.apiKey,
       workspace: data.workspaceID,
+      user_id: data.user.id,
       ...(() => {
         if (data.billing.subscription)
           return {

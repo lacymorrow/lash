@@ -42,7 +42,7 @@ export const QuestionDock: Component<{ request: QuestionRequest }> = (props) => 
     if (store.sending) return
 
     setStore("sending", true)
-    sdk.client.question
+    sdk().client.question
       .reply({ requestID: props.request.id, answers })
       .catch(fail)
       .finally(() => setStore("sending", false))
@@ -52,7 +52,7 @@ export const QuestionDock: Component<{ request: QuestionRequest }> = (props) => 
     if (store.sending) return
 
     setStore("sending", true)
-    sdk.client.question
+    sdk().client.question
       .reject({ requestID: props.request.id })
       .catch(fail)
       .finally(() => setStore("sending", false))
