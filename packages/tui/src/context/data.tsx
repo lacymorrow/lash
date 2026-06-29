@@ -16,7 +16,7 @@ import type {
   SessionMessageAssistantTool,
   SessionV2Info,
   SkillV2Info,
-  V2Event1 as V2Event,
+  V2Event,
 } from "@opencode-ai/sdk/v2"
 import { createStore, produce } from "solid-js/store"
 import { createSimpleContext } from "./helper"
