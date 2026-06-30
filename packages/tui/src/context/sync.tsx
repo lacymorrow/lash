@@ -32,6 +32,7 @@ import { useArgs } from "./args"
 import { batch, onMount } from "solid-js"
 import path from "path"
 import { useKV } from "./kv"
+import { usePermission } from "./permission"
 
 const emptyConsoleState: ConsoleState = {
   consoleManagedProviders: [],
@@ -60,6 +61,7 @@ export const {
   init: () => {
     const startup = useTuiStartup()
     const kv = useKV()
+    const permission = usePermission()
     const [store, setStore] = createStore<{
       status: "loading" | "partial" | "complete"
       provider: Provider[]
@@ -168,7 +170,7 @@ export const {
         .then((x) => (x.data ?? []).toSorted((a, b) => a.id.localeCompare(b.id)))
     }
 
-    event.subscribe((event, { workspace }) => {
+    event.subscribe((event, { directory, workspace }) => {
       switch (event.type) {
         case "server.instance.disposed":
           void bootstrap()
@@ -190,6 +192,15 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
+          if (permission.mode === "auto") {
+            void sdk.client.permission.reply({
+              requestID: request.id,
+              reply: "once",
+              directory,
+              workspace,
+            })
+            break
+          }
           const requests = store.permission[request.sessionID]
           if (!requests) {
             setStore("permission", request.sessionID, [request])
