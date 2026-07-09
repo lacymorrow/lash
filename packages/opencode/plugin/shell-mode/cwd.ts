@@ -27,13 +27,17 @@ export const CwdEvent = {
 /**
  * Get the current working directory.
  * Returns Instance.directory if not explicitly set.
+ *
+ * The ambient instance context is only entered by CLI `bootstrap()`; Effect-based
+ * callers (tools, session prompt) run with `InstanceRef` instead and must pass the
+ * instance directory as `fallback` or getCwd degrades to process.cwd().
  */
-export function getCwd(): string {
+export function getCwd(fallback?: string): string {
   if (currentCwd === null) {
     try {
       return instanceContext.use().directory
     } catch {
-      return process.cwd()
+      return fallback ?? process.cwd()
     }
   }
   return currentCwd

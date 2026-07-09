@@ -274,7 +274,7 @@ export const layer = Layer.effect(
         mode: task.agent,
         agent: task.agent,
         variant: lastUser.model.variant,
-        path: { cwd: getCwd(), root: ctx.worktree },
+        path: { cwd: getCwd(ctx.directory), root: ctx.worktree },
         cost: 0,
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
         modelID: taskModel.id,
@@ -494,7 +494,7 @@ export const layer = Layer.effect(
               mode: input.agent,
               agent: input.agent,
               cost: 0,
-              path: { cwd: getCwd(), root: ctx.worktree },
+              path: { cwd: getCwd(ctx.directory), root: ctx.worktree },
               time: { created: Date.now() },
               role: "assistant",
               tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
@@ -517,7 +517,7 @@ export const layer = Layer.effect(
               },
             }
             yield* sessions.updatePart(part)
-            return { msg, part, cwd: getCwd() }
+            return { msg, part, cwd: getCwd(ctx.directory) }
           }).pipe(Effect.ensuring(markReady))
 
           const cfg = yield* config.get()
@@ -600,13 +600,19 @@ export const layer = Layer.effect(
           let output = ""
           let aborted = false
 
-          const getDisplayOutput = () => {
-            const sentinelIndex = output.lastIndexOf(cwdSentinel)
-            if (sentinelIndex === -1) return output
-            let lineStart = sentinelIndex
-            while (lineStart > 0 && output[lineStart - 1] !== "\n") lineStart--
-            return output.slice(0, lineStart).trimEnd()
+          // Remove the sentinel line but keep everything around it: output with no
+          // trailing newline shares the sentinel's line, and stderr chunks from the
+          // merged stream can arrive after the sentinel was written to stdout.
+          const stripSentinel = (raw: string) => {
+            const sentinelIndex = raw.lastIndexOf(cwdSentinel)
+            if (sentinelIndex === -1) return raw
+            const afterSentinel = raw.slice(sentinelIndex + cwdSentinel.length)
+            const newlineIndex = afterSentinel.indexOf("\n")
+            const rest = newlineIndex === -1 ? "" : afterSentinel.slice(newlineIndex + 1)
+            return (raw.slice(0, sentinelIndex) + rest).trimEnd()
           }
+
+          const getDisplayOutput = () => stripSentinel(output)
 
           const finish = Effect.uninterruptible(
             Effect.gen(function* () {
@@ -630,9 +636,7 @@ export const layer = Layer.effect(
                 } else if (payload) {
                   setCwd(payload)
                 }
-                let lineStart = sentinelIndex
-                while (lineStart > 0 && output[lineStart - 1] !== "\n") lineStart--
-                cleanOutput = output.slice(0, lineStart).trimEnd()
+                cleanOutput = stripSentinel(output)
               }
 
               const hint = detectNaturalLanguage(input.command, cleanOutput, commandExitCode)
@@ -1298,7 +1302,7 @@ export const layer = Layer.effect(
             mode: agent.name,
             agent: agent.name,
             variant: lastUser.model.variant,
-            path: { cwd: getCwd(), root: ctx.worktree },
+            path: { cwd: getCwd(ctx.directory), root: ctx.worktree },
             cost: 0,
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
             modelID: model.id,
