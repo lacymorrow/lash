@@ -10,6 +10,10 @@ import { testEffect } from "../lib/effect"
 
 const it = testEffect(LayerNode.compile(Ripgrep.node))
 
+// first Ripgrep use may download and extract the rg binary, which exceeds the
+// default 5s test timeout on Windows CI runners (PowerShell Expand-Archive)
+const RG_DOWNLOAD = { timeout: 120_000 }
+
 const withTmp = <A, E, R>(f: (directory: AbsolutePath) => Effect.Effect<A, E, R>) =>
   Effect.acquireRelease(
     Effect.promise(() => tmpdir()),
@@ -26,6 +30,7 @@ describe("Ripgrep", () => {
         expect(result.map((item) => item.path)).toEqual([RelativePath.make("src/match.ts")])
       }),
     ),
+    RG_DOWNLOAD,
   )
 
   it.live("greps files with include filtering", () =>
@@ -40,5 +45,6 @@ describe("Ripgrep", () => {
         expect(result[0]?.submatches[0]?.text).toBe("needle")
       }),
     ),
+    RG_DOWNLOAD,
   )
 })

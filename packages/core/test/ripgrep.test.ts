@@ -10,6 +10,10 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(LayerNode.compile(Ripgrep.node))
 
+// first Ripgrep use may download and extract the rg binary, which exceeds the
+// default 5s test timeout on Windows CI runners (PowerShell Expand-Archive)
+const RG_DOWNLOAD = { timeout: 120_000 }
+
 describe("Ripgrep", () => {
   it.live("keeps ignored files out of catch-all find results", () =>
     Effect.acquireUseRelease(
@@ -29,6 +33,7 @@ describe("Ripgrep", () => {
         }),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
     ),
+    RG_DOWNLOAD,
   )
 
   it.live("never includes git metadata", () =>
@@ -61,5 +66,6 @@ describe("Ripgrep", () => {
         }),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
     ),
+    RG_DOWNLOAD,
   )
 })
