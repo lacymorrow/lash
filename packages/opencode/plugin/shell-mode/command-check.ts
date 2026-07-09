@@ -4,8 +4,8 @@
  * on every keystroke. Aliases are loaded once in the background at startup.
  */
 
-import { Shell } from "@/shell/shell"
-import { which } from "@/util/which"
+import { Shell } from "@opencode-ai/core/shell"
+import { which } from "@opencode-ai/core/util/which"
 import { spawn as nodeSpawn } from "node:child_process"
 import path from "path"
 

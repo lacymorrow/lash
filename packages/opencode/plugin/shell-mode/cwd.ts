@@ -4,8 +4,8 @@
  */
 
 import { context as instanceContext } from "@/project/instance-context"
-import { Bus } from "@/bus"
-import { BusEvent } from "@/bus/bus-event"
+import { GlobalBus } from "@/bus/global"
+import { EventV2 } from "@opencode-ai/core/event"
 import path from "path"
 import os from "os"
 import { Schema } from "effect"
@@ -16,24 +16,28 @@ let currentCwd: string | null = null
  * Event published when the working directory changes.
  */
 export const CwdEvent = {
-  Updated: BusEvent.define(
-    "cwd.updated",
-    Schema.Struct({
+  Updated: EventV2.define({
+    type: "cwd.updated",
+    schema: {
       cwd: Schema.String,
-    }),
-  ),
+    },
+  }),
 }
 
 /**
  * Get the current working directory.
  * Returns Instance.directory if not explicitly set.
+ *
+ * The ambient instance context is only entered by CLI `bootstrap()`; Effect-based
+ * callers (tools, session prompt) run with `InstanceRef` instead and must pass the
+ * instance directory as `fallback` or getCwd degrades to process.cwd().
  */
-export function getCwd(): string {
+export function getCwd(fallback?: string): string {
   if (currentCwd === null) {
     try {
       return instanceContext.use().directory
     } catch {
-      return process.cwd()
+      return fallback ?? process.cwd()
     }
   }
   return currentCwd
@@ -59,10 +63,18 @@ export function setCwd(dir: string): void {
   const changed = currentCwd !== resolved
   currentCwd = resolved
 
-  // Publish event if cwd changed
+  // Publish event if cwd changed. EventV2 / Bus refactor (upstream PR #29068)
+  // collapsed BusEvent.publish into GlobalBus.emit for ambient (non-Effect) callers.
   if (changed) {
     try {
-      void Bus.publish(instanceContext.use(), CwdEvent.Updated, { cwd: resolved })
+      const ctx = instanceContext.use()
+      GlobalBus.emit("event", {
+        directory: ctx.directory,
+        payload: {
+          type: CwdEvent.Updated.type,
+          properties: { cwd: resolved },
+        },
+      })
     } catch {
       // No instance context available; skip publishing
     }

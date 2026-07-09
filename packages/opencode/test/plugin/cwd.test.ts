@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
 import { getCwd, setCwd, resetCwd, CwdEvent } from "../../plugin/shell-mode/cwd"
-import { Bus } from "../../src/bus"
+import { GlobalBus, type GlobalEvent } from "../../src/bus/global"
 import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 
 afterEach(async () => {
@@ -13,6 +13,16 @@ afterEach(async () => {
 async function withInstance(fn: () => Promise<void>): Promise<void> {
   await using tmp = await tmpdir()
   await provideTestInstance({ directory: tmp.path, fn })
+}
+
+function subscribeCwd(received: string[]): () => void {
+  const handler = (event: GlobalEvent) => {
+    if (event.payload?.type !== CwdEvent.Updated.type) return
+    const cwd = event.payload.properties?.cwd
+    if (typeof cwd === "string") received.push(cwd)
+  }
+  GlobalBus.on("event", handler)
+  return () => GlobalBus.off("event", handler)
 }
 
 describe("setCwd / getCwd — unit", () => {
@@ -122,9 +132,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
-        const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
-          received.push(evt.properties.cwd)
-        })
+        const unsub = subscribeCwd(received)
         await Bun.sleep(10)
 
         setCwd("/tmp")
@@ -143,9 +151,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
-        const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
-          received.push(evt.properties.cwd)
-        })
+        const unsub = subscribeCwd(received)
         await Bun.sleep(10)
 
         setCwd("/tmp")
@@ -165,9 +171,7 @@ describe("CwdEvent.Updated — LAC-742 regression", () => {
     await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
-        const unsub = Bus.subscribe(CwdEvent.Updated, (evt) => {
-          received.push(evt.properties.cwd)
-        })
+        const unsub = subscribeCwd(received)
         await Bun.sleep(10)
 
         setCwd("/tmp")

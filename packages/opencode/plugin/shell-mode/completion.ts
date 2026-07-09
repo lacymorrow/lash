@@ -7,7 +7,7 @@ import { spawn } from "child_process"
 import path from "path"
 import os from "os"
 import fs from "fs"
-import { Shell } from "@/shell/shell"
+import { Shell } from "@opencode-ai/core/shell"
 import { getCwd } from "./cwd"
 
 export type CompletionResult = {

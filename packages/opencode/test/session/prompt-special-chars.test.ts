@@ -1,28 +1,25 @@
 import path from "path"
 import { describe, expect, test } from "bun:test"
 import { fileURLToPath } from "url"
-import * as Log from "@opencode-ai/core/util/log"
 import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
-import { AppRuntime } from "../../src/effect/app-runtime"
+import { runTestApp } from "../fixture/app"
 import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
-void Log.init({ print: false })
-
 function sessionCreate(input?: Session.CreateInput) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.create(input)))
+  return runTestApp(Session.Service.use((svc) => svc.create(input)))
 }
 
 function sessionRemove(id: Session.Info["id"]) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.remove(id)))
+  return runTestApp(Session.Service.use((svc) => svc.remove(id)))
 }
 
 function resolvePromptParts(template: string) {
-  return AppRuntime.runPromise(SessionPrompt.Service.use((svc) => svc.resolvePromptParts(template)))
+  return runTestApp(SessionPrompt.Service.use((svc) => svc.resolvePromptParts(template)))
 }
 
 function sessionPrompt(input: SessionPrompt.PromptInput) {
-  return AppRuntime.runPromise(SessionPrompt.Service.use((svc) => svc.prompt(input)))
+  return runTestApp(SessionPrompt.Service.use((svc) => svc.prompt(input)))
 }
 
 describe("session.prompt special characters", () => {

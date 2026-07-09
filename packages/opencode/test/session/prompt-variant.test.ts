@@ -1,20 +1,21 @@
 import { describe, expect, test } from "bun:test"
 import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
-import { ProviderID, ModelID } from "../../src/provider/schema"
-import { AppRuntime } from "../../src/effect/app-runtime"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { runTestApp } from "../fixture/app"
 import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
 function sessionCreate(input?: Session.CreateInput) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.create(input)))
+  return runTestApp(Session.Service.use((svc) => svc.create(input)))
 }
 
 function sessionRemove(id: Session.Info["id"]) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.remove(id)))
+  return runTestApp(Session.Service.use((svc) => svc.remove(id)))
 }
 
 function sessionPrompt(input: SessionPrompt.PromptInput) {
-  return AppRuntime.runPromise(SessionPrompt.Service.use((svc) => svc.prompt(input)))
+  return runTestApp(SessionPrompt.Service.use((svc) => svc.prompt(input)))
 }
 
 describe("session.prompt agent variant", () => {
@@ -43,7 +44,7 @@ describe("session.prompt agent variant", () => {
           const other = await sessionPrompt({
             sessionID: session.id,
             agent: "build",
-            model: { providerID: ProviderID.make("opencode"), modelID: ModelID.make("kimi-k2.5-free") },
+            model: { providerID: ProviderV2.ID.make("opencode"), modelID: ModelV2.ID.make("kimi-k2.5-free") },
             noReply: true,
             parts: [{ type: "text", text: "hello" }],
           })
@@ -57,8 +58,8 @@ describe("session.prompt agent variant", () => {
             parts: [{ type: "text", text: "hello again" }],
           })
           if (match.info.role !== "user") throw new Error("expected user message")
-          expect(match.info.model.providerID).toEqual(ProviderID.make("openai"))
-          expect(match.info.model.modelID).toEqual(ModelID.make("gpt-5.2"))
+          expect(match.info.model.providerID).toEqual(ProviderV2.ID.make("openai"))
+          expect(match.info.model.modelID).toEqual(ModelV2.ID.make("gpt-5.2"))
           expect(match.info.model.variant).toBe("xhigh")
 
           const override = await sessionPrompt({

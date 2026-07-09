@@ -1,4 +1,6 @@
-import { expect, test, type Page, type Route } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
+import { mockOpenCodeServer } from "../utils/mock-server"
+import { expectAppVisible, expectSessionTitle } from "../utils/waits"
 
 const directory = "C:/OpenCode/ContextResizeRegression"
 const projectID = "proj_context_resize_regression"
@@ -22,15 +24,13 @@ test.describe("regression: session timeline context group resize", () => {
     await configurePage(page)
 
     await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
-    await expect(page.getByRole("heading", { name: title })).toBeVisible()
-    await expect(page.locator(`[data-timeline-part-ids="${contextIDs.join(",")}"]`).first()).toBeVisible()
-    await expect(page.locator(`[data-timeline-part-id="${followingTextID}"]`).first()).toBeVisible()
+    await expectSessionTitle(page, title)
+    await expectAppVisible(page.locator(`[data-timeline-part-ids="${contextIDs.join(",")}"]`).first())
+    await expectAppVisible(page.locator(`[data-timeline-part-id="${followingTextID}"]`).first())
     await settle(page)
 
     const samples = await sampleExpansion(page)
     const visibleOverlap = samples.filter((sample) => sample.frame >= 1 && sample.overlap > 0.5)
-
-    console.log("context resize samples", JSON.stringify(samples, null, 2))
 
     expect(samples[0]?.overlap).toBe(0)
     expect(visibleOverlap).toEqual([])
@@ -47,7 +47,6 @@ async function configurePage(page: Page) {
           editToolPartsExpanded: true,
           shellToolPartsExpanded: true,
           showReasoningSummaries: true,
-          showSessionProgressBar: true,
         },
       }),
     )
@@ -113,13 +112,15 @@ async function sampleExpansion(page: Page) {
 
         let frame = 1
         const tick = () => {
-          capture(frame, "raf")
-          frame += 1
-          if (frame > 8) {
-            resolve(samples)
-            return
-          }
-          requestAnimationFrame(tick)
+          setTimeout(() => {
+            capture(frame, "painted")
+            frame += 1
+            if (frame > 8) {
+              resolve(samples)
+              return
+            }
+            requestAnimationFrame(tick)
+          }, 0)
         }
         requestAnimationFrame(tick)
       }),
@@ -207,33 +208,12 @@ function contextTool(partID: string, messageID: string, tool: string, input: Rec
 }
 
 async function mockServer(page: Page) {
-  await page.route("**/*", async (route) => {
-    const url = new URL(route.request().url())
-    const targetPort = process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"
-    if (url.port !== targetPort) return route.fallback()
-
-    const path = url.pathname
-    if (path === "/global/event" || path === "/event") return sse(route)
-    if (["/global/config", "/config", "/provider/auth", "/mcp", "/session/status"].includes(path))
-      return json(route, {})
-    if (
-      ["/skill", "/command", "/lsp", "/formatter", "/permission", "/question", "/vcs/status", "/vcs/diff"].includes(
-        path,
-      )
-    )
-      return json(route, [])
-    if (path === "/provider") return json(route, provider())
-    if (path === "/path")
-      return json(route, { state: directory, config: directory, worktree: directory, directory, home: "C:/OpenCode" })
-    if (path === "/project") return json(route, [project()])
-    if (path === "/project/current") return json(route, project())
-    if (path === "/agent") return json(route, [{ name: "build", mode: "primary" }])
-    if (path === "/vcs") return json(route, { branch: "main", default_branch: "main" })
-    if (path === "/session") return json(route, [session()])
-    if (path === `/session/${sessionID}`) return json(route, session())
-    if (/^\/session\/[^/]+\/(children|todo|diff)$/.test(path)) return json(route, [])
-    if (path === `/session/${sessionID}/message`) return json(route, messages)
-    return json(route, {})
+  await mockOpenCodeServer(page, {
+    directory,
+    project: project(),
+    provider: provider(),
+    sessions: [session()],
+    pageMessages: () => ({ items: messages }),
   })
 }
 
@@ -280,19 +260,6 @@ function provider() {
     connected: ["opencode"],
     default: { providerID: "opencode", modelID: "claude-opus-4-6" },
   }
-}
-
-function json(route: Route, body: unknown, headers?: Record<string, string>) {
-  return route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    headers: { "access-control-allow-origin": "*", "access-control-expose-headers": "x-next-cursor", ...headers },
-    body: JSON.stringify(body ?? null),
-  })
-}
-
-function sse(route: Route) {
-  return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ok\n\n" })
 }
 
 function base64Encode(value: string) {

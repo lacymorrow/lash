@@ -15,7 +15,7 @@ import type {
   Todo,
   VcsInfo,
 } from "@opencode-ai/sdk/v2/client"
-import { NormalizedProviderListResponse } from "@opencode-ai/ui/context"
+import { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
 import type { Accessor } from "solid-js"
 import type { SetStoreFunction, Store } from "solid-js/store"
 
@@ -98,6 +98,7 @@ export type IconCache = {
 
 export type ChildOptions = {
   bootstrap?: boolean
+  mcp?: boolean
 }
 
 export type DirState = {

@@ -7,13 +7,15 @@ import { spawn, type ChildProcess } from "child_process"
 import { ulid } from "ulid"
 import path from "path"
 import os from "os"
-import { Bus } from "@/bus"
+import { GlobalBus, type GlobalEvent } from "@/bus/global"
 import { SessionStatus } from "@/session/status"
-import * as Log from "@opencode-ai/core/util/log"
-import { Shell } from "@/shell/shell"
+import { Shell } from "@opencode-ai/core/shell"
 import { getCwd, setCwd } from "./cwd"
 
-const log = Log.create({ service: "session-shell" })
+const log = {
+  info: (...args: unknown[]) => console.log("[session-shell]", ...args),
+  error: (...args: unknown[]) => console.error("[session-shell]", ...args),
+}
 
 // Idle timeout before disposing shell (2 minutes)
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000
@@ -331,12 +333,19 @@ function ensureSubscribed() {
   if (subscribed) return
   subscribed = true
 
-  // Listen for session idle events to schedule cleanup
-  Bus.subscribe(SessionStatus.Event.Idle, (evt) => {
-    const shell = shells.get(evt.properties.sessionID)
+  // Listen for session idle events to schedule cleanup.
+  // Upstream PR #29068 replaced the per-instance Bus.subscribe with GlobalBus.on
+  // for ambient (non-Effect) callers; filter by event type on the GlobalEvent payload.
+  GlobalBus.on("event", (event: GlobalEvent) => {
+    const payload = event.payload
+    if (!payload || typeof payload !== "object") return
+    if (payload.type !== SessionStatus.Event.Idle.type) return
+    const sessionID = payload.properties?.sessionID
+    if (typeof sessionID !== "string") return
+    const shell = shells.get(sessionID)
     if (shell) {
       shell.resetIdleTimer(() => {
-        dispose(evt.properties.sessionID)
+        dispose(sessionID)
       })
     }
   })
