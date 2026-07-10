@@ -7,6 +7,7 @@
 import { Shell } from "@opencode-ai/core/shell"
 import { which } from "@opencode-ai/core/util/which"
 import { spawn as nodeSpawn } from "node:child_process"
+import { realpathSync } from "node:fs"
 import path from "path"
 
 /**
@@ -444,7 +445,25 @@ function commandExists(cmd: string): boolean {
   if (SHELL_BUILTINS.has(cmd)) return true
 
   // PATH executables (synchronous, no shell spawn)
-  if (which(cmd) !== null) return true
+  const found = which(cmd)
+  if (found !== null) return process.platform !== "win32" || matchesCanonicalCase(cmd, found)
 
   return false
+}
+
+/**
+ * Windows PATH lookup is case-insensitive, which erases the casing signal this
+ * heuristic relies on: a capitalized first word ("Help me fix this bug") is a
+ * strong natural-language marker, and on POSIX it already fails the lookup.
+ * Require the typed name to match the executable's on-disk casing so routing
+ * behaves the same across platforms (LAC-2693).
+ */
+function matchesCanonicalCase(cmd: string, found: string): boolean {
+  try {
+    const base = path.win32.basename(realpathSync.native(found))
+    const name = base.slice(0, base.length - path.win32.extname(base).length)
+    return cmd === name || cmd === base
+  } catch {
+    return true
+  }
 }

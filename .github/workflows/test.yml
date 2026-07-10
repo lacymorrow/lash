@@ -28,9 +28,9 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
+            host: ubuntu-24.04
           - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: windows-2025
     runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
@@ -63,9 +63,33 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('turbo.json', '**/package.json') }}-
             turbo-${{ runner.os }}-
 
+      - name: Install ripgrep (Windows)
+        # RipgrepBinary prefers a PATH-resolved rg.exe; without one, the first
+        # ripgrep test pays a cold download + Expand-Archive that exceeds the
+        # 5s per-test timeout on hosted runners. Version pinned to match
+        # packages/core/src/ripgrep/binary.ts.
+        if: runner.os == 'Windows'
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/rg.zip" https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip
+          7z e "$RUNNER_TEMP/rg.zip" -o"$RUNNER_TEMP/ripgrep" rg.exe -r -y
+          "$RUNNER_TEMP/ripgrep/rg.exe" --version
+          echo "$RUNNER_TEMP/ripgrep" >> "$GITHUB_PATH"
+
+      - name: Cache downloaded tool binaries
+        # Ripgrep tests download rg into ~/.cache/opencode/bin on first use;
+        # on GitHub-hosted windows runners that download has blown the test
+        # timeout. Cache it so only version bumps re-download.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/opencode/bin
+          key: opencode-bin-${{ runner.os }}-${{ hashFiles('packages/core/src/ripgrep/binary.ts') }}
       - name: Run unit tests
-        timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
+        # opencode#test alone takes ~20 minutes on GitHub-hosted windows runners.
+        # --log-order=stream keeps per-task output visible if the step is ever
+        # killed; turbo's CI default (grouped) buffers a task's output until it
+        # finishes, so a timeout eats the entire log (LAC-2717).
+        timeout-minutes: 35
+        run: GITHUB_ACTIONS=false bun turbo test --log-order=stream
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
@@ -86,9 +110,9 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
+            host: ubuntu-24.04
           - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: windows-2025
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers

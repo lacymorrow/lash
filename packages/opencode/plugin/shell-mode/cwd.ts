@@ -27,13 +27,17 @@ export const CwdEvent = {
 /**
  * Get the current working directory.
  * Returns Instance.directory if not explicitly set.
+ *
+ * The ambient instance context is only entered by CLI `bootstrap()`; Effect-based
+ * callers (tools, session prompt) run with `InstanceRef` instead and must pass the
+ * instance directory as `fallback` or getCwd degrades to process.cwd().
  */
-export function getCwd(): string {
+export function getCwd(fallback?: string): string {
   if (currentCwd === null) {
     try {
       return instanceContext.use().directory
     } catch {
-      return process.cwd()
+      return fallback ?? process.cwd()
     }
   }
   return currentCwd
@@ -82,4 +86,37 @@ export function setCwd(dir: string): void {
  */
 export function resetCwd(): void {
   currentCwd = null
+}
+
+export interface CwdSentinelResult {
+  exitCode: number | null
+  cwd: string | null
+}
+
+/**
+ * Parse the payload that follows the cwd sentinel in wrapped shell output:
+ * "<exitCode>:<cwd>", or legacy "<cwd>" with no exit code.
+ *
+ * Shells always report their working directory as an absolute path. A
+ * non-absolute value means the wrapper template was not expanded by the
+ * shell that ran it (e.g. cmd.exe echoing a bash-style "$(pwd -P ...)"
+ * literally, or bash echoing "%CD%"). Such values must never reach
+ * setCwd — the poisoned cwd is shared process-wide and makes every
+ * subsequent spawn fail its cwd access check (LAC-2693).
+ */
+export function parseCwdSentinelPayload(payload: string): CwdSentinelResult {
+  let exitCode: number | null = null
+  let cwd: string | null = payload || null
+  const colonIndex = payload.indexOf(":")
+  if (colonIndex !== -1) {
+    const code = parseInt(payload.slice(0, colonIndex), 10)
+    // A non-numeric prefix means the colon belongs to the cwd itself
+    // (e.g. a bare "D:\foo" drive path), not an exit-code separator.
+    if (!isNaN(code)) {
+      exitCode = code
+      cwd = payload.slice(colonIndex + 1).trim() || null
+    }
+  }
+  if (cwd && !path.win32.isAbsolute(cwd) && !path.posix.isAbsolute(cwd)) cwd = null
+  return { exitCode, cwd }
 }

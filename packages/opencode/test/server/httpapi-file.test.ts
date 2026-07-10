@@ -52,32 +52,40 @@ describe("file HttpApi", () => {
     expect(await status.json()).toEqual([])
   })
 
-  test("serves search endpoints", async () => {
-    await using tmp = await tmpdir({ git: true })
-    await Bun.write(path.join(tmp.path, "hello.txt"), "needle")
+  test(
+    "serves search endpoints",
+    async () => {
+      await using tmp = await tmpdir({ git: true })
+      await Bun.write(path.join(tmp.path, "hello.txt"), "needle")
 
-    const [text, symbols] = await Promise.all([
-      request(FilePaths.findText, tmp.path, { pattern: "needle" }),
-      request(FilePaths.findSymbol, tmp.path, { query: "hello" }),
-    ])
-    const files = await Effect.runPromise(
-      pollWithTimeout(
-        Effect.promise(async () => {
-          const response = await request(FilePaths.findFile, tmp.path, { query: "hello", type: "file" })
-          const body = await response.json()
-          return body.includes("hello.txt") ? { response, body } : undefined
-        }),
-        "file search index was not ready",
-      ),
-    )
+      const [text, symbols] = await Promise.all([
+        request(FilePaths.findText, tmp.path, { pattern: "needle" }),
+        request(FilePaths.findSymbol, tmp.path, { query: "hello" }),
+      ])
+      const files = await Effect.runPromise(
+        pollWithTimeout(
+          Effect.promise(async () => {
+            const response = await request(FilePaths.findFile, tmp.path, { query: "hello", type: "file" })
+            const body = await response.json()
+            return body.includes("hello.txt") ? { response, body } : undefined
+          }),
+          "file search index was not ready",
+          // Index build regularly exceeds the 5s default on windows runners (LAC-2693)
+          "60 seconds",
+        ),
+      )
 
-    expect(text.status).toBe(200)
-    expect(await text.json()).toContainEqual(expect.objectContaining({ line_number: 1 }))
+      expect(text.status).toBe(200)
+      expect(await text.json()).toContainEqual(expect.objectContaining({ line_number: 1 }))
 
-    expect(files.response.status).toBe(200)
-    expect(files.body).toContain("hello.txt")
+      expect(files.response.status).toBe(200)
+      expect(files.body).toContain("hello.txt")
 
-    expect(symbols.status).toBe(200)
-    expect(await symbols.json()).toEqual([])
-  })
+      expect(symbols.status).toBe(200)
+      expect(await symbols.json()).toEqual([])
+    },
+    // Must exceed the poll window above — the suite-wide --timeout 30000 would
+    // otherwise fire before the index-ready poll can complete (LAC-2693)
+    90_000,
+  )
 })

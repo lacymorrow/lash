@@ -31,6 +31,18 @@ afterAll(async () => {
   await rm(30)
 })
 
+// Seed the ripgrep binary from the user's real cache before redirecting
+// XDG_CACHE_HOME below — the per-PID redirect otherwise starts cold, so every
+// test run re-downloads rg mid-suite; on windows CI that download has blown
+// test timeouts (LAC-2693). The CI workflow caches the real bin dir.
+{
+  const rg = `rg${process.platform === "win32" ? ".exe" : ""}`
+  const realCache = process.env["XDG_CACHE_HOME"] ?? path.join(os.homedir(), ".cache")
+  const testBin = path.join(dir, "cache", "opencode", "bin")
+  await fs.mkdir(testBin, { recursive: true })
+  await fs.copyFile(path.join(realCache, "opencode", "bin", rg), path.join(testBin, rg)).catch(() => {})
+}
+
 process.env["XDG_DATA_HOME"] = path.join(dir, "share")
 process.env["XDG_CACHE_HOME"] = path.join(dir, "cache")
 process.env["XDG_CONFIG_HOME"] = path.join(dir, "config")
