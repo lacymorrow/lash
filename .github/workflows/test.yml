@@ -63,6 +63,18 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('turbo.json', '**/package.json') }}-
             turbo-${{ runner.os }}-
 
+      - name: Install ripgrep (Windows)
+        # RipgrepBinary prefers a PATH-resolved rg.exe; without one, the first
+        # ripgrep test pays a cold download + Expand-Archive that exceeds the
+        # 5s per-test timeout on hosted runners. Version pinned to match
+        # packages/core/src/ripgrep/binary.ts.
+        if: runner.os == 'Windows'
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/rg.zip" https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip
+          7z e "$RUNNER_TEMP/rg.zip" -o"$RUNNER_TEMP/ripgrep" rg.exe -r -y
+          "$RUNNER_TEMP/ripgrep/rg.exe" --version
+          echo "$RUNNER_TEMP/ripgrep" >> "$GITHUB_PATH"
+
       - name: Run unit tests
         timeout-minutes: 20
         run: GITHUB_ACTIONS=false bun turbo test
