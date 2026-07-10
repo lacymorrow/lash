@@ -84,9 +84,12 @@ jobs:
           path: ~/.cache/opencode/bin
           key: opencode-bin-${{ runner.os }}-${{ hashFiles('packages/core/src/ripgrep/binary.ts') }}
       - name: Run unit tests
-        # opencode#test alone takes ~20 minutes on GitHub-hosted windows runners
+        # opencode#test alone takes ~20 minutes on GitHub-hosted windows runners.
+        # --log-order=stream keeps per-task output visible if the step is ever
+        # killed; turbo's CI default (grouped) buffers a task's output until it
+        # finishes, so a timeout eats the entire log (LAC-2717).
         timeout-minutes: 35
-        run: GITHUB_ACTIONS=false bun turbo test
+        run: GITHUB_ACTIONS=false bun turbo test --log-order=stream
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
