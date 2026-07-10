@@ -12,7 +12,10 @@ import { git, gitRemote } from "./fixture/git"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(Layer.empty)
+// These tests chain many git subprocess ops; on GitHub-hosted Windows runners
+// each op costs 100ms-2.8s under full-suite load, exceeding bun's 5s default
+// per-test timeout (LAC-2717).
+const it = testEffect(Layer.empty, { timeout: 30_000 })
 
 describe("RepositoryCache", () => {
   it.live("replaces a stale cache directory before cloning", () =>
