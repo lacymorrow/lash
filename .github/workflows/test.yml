@@ -76,7 +76,8 @@ jobs:
           echo "$RUNNER_TEMP/ripgrep" >> "$GITHUB_PATH"
 
       - name: Run unit tests
-        timeout-minutes: 20
+        # opencode#test alone takes ~20 minutes on GitHub-hosted windows runners
+        timeout-minutes: 35
         run: GITHUB_ACTIONS=false bun turbo test
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}

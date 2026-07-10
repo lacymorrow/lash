@@ -68,6 +68,8 @@ describe("file HttpApi", () => {
           return body.includes("hello.txt") ? { response, body } : undefined
         }),
         "file search index was not ready",
+        // Index build regularly exceeds the 5s default on windows runners (LAC-2693)
+        "30 seconds",
       ),
     )
 
