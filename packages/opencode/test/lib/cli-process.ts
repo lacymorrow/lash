@@ -48,7 +48,17 @@ export const testModelID = "test/test-model"
 //    every child's transpiler cache cold. The cache is content-addressed, so
 //    sharing it does not leak state between tests.
 const spawnGate = Semaphore.makeUnsafe(Math.max(2, Math.min(4, Math.floor(os.availableParallelism() / 2))))
-const sharedTranspilerCache = path.join(os.tmpdir(), "opencode-test-bun-transpiler-cache")
+// Suffix the cache dir with the username: os.tmpdir() is shared, and another
+// user's 0755 cache dir would EACCES our transpiler-cache writes. userInfo()
+// can throw in containers without a passwd entry, hence the fallback chain.
+const cacheOwner = (() => {
+  try {
+    return os.userInfo().username
+  } catch {
+    return process.env["USER"] || process.env["USERNAME"] || "default"
+  }
+})()
+const sharedTranspilerCache = path.join(os.tmpdir(), `opencode-test-bun-transpiler-cache-${cacheOwner}`)
 fs.mkdirSync(sharedTranspilerCache, { recursive: true })
 
 // Wrap a Bun subprocess pipe (or any ReadableStream<Uint8Array>) as a Stream.
