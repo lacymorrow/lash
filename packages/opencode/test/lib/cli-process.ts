@@ -20,9 +20,11 @@
 import { test, type TestOptions } from "bun:test"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppProcess } from "@opencode-ai/core/process"
-import { Deferred, Duration, Effect, Layer, Queue, Schedule, Scope, Stream } from "effect"
+import { Deferred, Duration, Effect, Layer, Queue, Schedule, Scope, Semaphore, Stream } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
+import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { TestLLMServer } from "./llm-server"
 import { testProviderConfig } from "./test-provider"
@@ -32,6 +34,32 @@ const opencodeRoot = path.resolve(import.meta.dir, "../../")
 const cliEntry = path.join(opencodeRoot, "src/index.ts")
 
 export const testModelID = "test/test-model"
+
+// Cold-starting `bun run src/index.ts` transpiles the whole dependency graph.
+// With every cliIt.concurrent test spawning subprocesses at once, unbounded
+// fan-out starves small CI runners (4 vCPU on GitHub-hosted ubuntu) until every
+// child blows its 30s timeout with empty stdout (LAC-2715). Two mitigations:
+//
+// 1. spawnGate caps concurrent short-lived spawns near the core count. The
+//    per-spawn timer starts after the permit is acquired, so queue wait is not
+//    charged against timeoutMs or durationMs.
+// 2. All children share one Bun transpiler cache. isolatedEnv points HOME and
+//    XDG_CACHE_HOME at a fresh tmpdir per test, which would otherwise leave
+//    every child's transpiler cache cold. The cache is content-addressed, so
+//    sharing it does not leak state between tests.
+const spawnGate = Semaphore.makeUnsafe(Math.max(2, Math.min(4, Math.floor(os.availableParallelism() / 2))))
+// Suffix the cache dir with the username: os.tmpdir() is shared, and another
+// user's 0755 cache dir would EACCES our transpiler-cache writes. userInfo()
+// can throw in containers without a passwd entry, hence the fallback chain.
+const cacheOwner = (() => {
+  try {
+    return os.userInfo().username
+  } catch {
+    return process.env["USER"] || process.env["USERNAME"] || "default"
+  }
+})()
+const sharedTranspilerCache = path.join(os.tmpdir(), `opencode-test-bun-transpiler-cache-${cacheOwner}`)
+fs.mkdirSync(sharedTranspilerCache, { recursive: true })
 
 // Wrap a Bun subprocess pipe (or any ReadableStream<Uint8Array>) as a Stream.
 // Centralizes the `evaluate` + `onError` boilerplate and tags errors with the
@@ -65,6 +93,7 @@ function isolatedEnv(home: string, configJson: string): Record<string, string> {
     XDG_DATA_HOME: path.join(home, ".local/share"),
     XDG_STATE_HOME: path.join(home, ".local/state"),
     XDG_CACHE_HOME: path.join(home, ".cache"),
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: sharedTranspilerCache,
     OPENCODE_CONFIG_CONTENT: configJson,
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_PURE: "1",
@@ -203,47 +232,57 @@ export function withCliFixture<A, E>(
     const env = isolatedEnv(home, configJson)
 
     const spawn = Effect.fn("opencode.spawn")(function* (args: string[], opts?: SpawnOpts) {
-      const start = Date.now()
-      const timeoutMs = opts?.timeoutMs ?? 30_000
-      // stdin: "ignore" so the child doesn't see a piped stdin and block
-      // on `Bun.stdin.text()` (see src/cli/cmd/run.ts — non-TTY stdin is
-      // consumed as the prompt). The old Process.run wrapper defaulted to
-      // ignore; ChildProcess.make defaults to pipe, so we set it explicitly.
-      const command = ChildProcess.make("bun", ["run", "--conditions=browser", cliEntry, ...args], {
-        cwd: home,
-        env: { ...env, ...opts?.env },
-        extendEnv: true,
-        stdin: "ignore",
-      })
-      // Pass timeout to appProc.run rather than wrapping with
-      // Effect.timeoutOrElse externally: AppProcess.run is itself scoped, so
-      // its built-in timeout triggers the acquireRelease kill finalizer
-      // inside cross-spawn-spawner *before* surfacing the AppProcessError —
-      // guaranteeing the child is dead by the time the test continues.
-      // External timeoutOrElse interrupts the run fiber but races the
-      // scope close, which can leak the child past the test boundary.
-      //
-      // Catch AppProcessError (timeout OR spawn failure) and synthesize a
-      // non-zero result so the test sees it via the usual `expectExit`
-      // path rather than as an unhandled Effect failure.
-      const result = yield* appProc.run(command, { timeout: Duration.millis(timeoutMs) }).pipe(
-        Effect.catchTag("AppProcessError", (err) =>
-          Effect.succeed({
-            command: err.command,
-            exitCode: err.exitCode ?? -1,
-            stdout: Buffer.alloc(0),
-            stderr: Buffer.from((err.stderr ?? String(err.cause ?? err.message)) + "\n"),
-            stdoutTruncated: false,
-            stderrTruncated: false,
-          } satisfies AppProcess.RunResult),
-        ),
+      return yield* spawnGate.withPermits(1)(
+        Effect.gen(function* () {
+          const start = Date.now()
+          const timeoutMs = opts?.timeoutMs ?? 30_000
+          // stdin: "ignore" so the child doesn't see a piped stdin and block
+          // on `Bun.stdin.text()` (see src/cli/cmd/run.ts — non-TTY stdin is
+          // consumed as the prompt). The old Process.run wrapper defaulted to
+          // ignore; ChildProcess.make defaults to pipe, so we set it explicitly.
+          const command = ChildProcess.make("bun", ["run", "--conditions=browser", cliEntry, ...args], {
+            cwd: home,
+            env: { ...env, ...opts?.env },
+            extendEnv: true,
+            stdin: "ignore",
+          })
+          // Pass timeout to appProc.run rather than wrapping with
+          // Effect.timeoutOrElse externally: AppProcess.run is itself scoped, so
+          // its built-in timeout triggers the acquireRelease kill finalizer
+          // inside cross-spawn-spawner *before* surfacing the AppProcessError —
+          // guaranteeing the child is dead by the time the test continues.
+          // External timeoutOrElse interrupts the run fiber but races the
+          // scope close, which can leak the child past the test boundary.
+          //
+          // Catch AppProcessError (timeout OR spawn failure) and synthesize a
+          // non-zero result so the test sees it via the usual `expectExit`
+          // path rather than as an unhandled Effect failure. AppProcess drops
+          // the child's collected stderr on timeout, so annotate the synthetic
+          // message with timing to make CI failures diagnosable.
+          const result = yield* appProc.run(command, { timeout: Duration.millis(timeoutMs) }).pipe(
+            Effect.catchTag("AppProcessError", (err) =>
+              Effect.succeed({
+                command: err.command,
+                exitCode: err.exitCode ?? -1,
+                stdout: Buffer.alloc(0),
+                stderr: Buffer.from(
+                  (err.stderr ??
+                    `${String(err.cause ?? err.message)} after ${Date.now() - start}ms (timeout ${timeoutMs}ms)`) +
+                    "\n",
+                ),
+                stdoutTruncated: false,
+                stderrTruncated: false,
+              } satisfies AppProcess.RunResult),
+            ),
+          )
+          return {
+            exitCode: result.exitCode,
+            stdout: normalizeLines(result.stdout.toString()),
+            stderr: normalizeLines(result.stderr.toString()),
+            durationMs: Date.now() - start,
+          }
+        }),
       )
-      return {
-        exitCode: result.exitCode,
-        stdout: normalizeLines(result.stdout.toString()),
-        stderr: normalizeLines(result.stderr.toString()),
-        durationMs: Date.now() - start,
-      }
     })
 
     const runArgs = (message: string, opts?: RunOpts) => {
