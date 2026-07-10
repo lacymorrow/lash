@@ -394,6 +394,8 @@ describe("HttpApi SDK", () => {
             Effect.map((result) => (result.data?.data.length ? result : undefined)),
           ),
           "SDK file search index was not ready",
+          // Index build regularly exceeds the 5s default on windows runners (LAC-2693)
+          "30 seconds",
         )
         const url = new URL(request!.url)
 

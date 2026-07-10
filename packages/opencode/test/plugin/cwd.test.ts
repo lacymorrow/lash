@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
-import { getCwd, setCwd, resetCwd, CwdEvent } from "../../plugin/shell-mode/cwd"
+import { getCwd, setCwd, resetCwd, parseCwdSentinelPayload, CwdEvent } from "../../plugin/shell-mode/cwd"
 import { GlobalBus, type GlobalEvent } from "../../src/bus/global"
 import { provideTestInstance, disposeAllInstances, tmpdir } from "../fixture/fixture"
 
@@ -47,11 +47,13 @@ describe("setCwd / getCwd — unit", () => {
     })
   })
 
+  // Expected values go through path.resolve so they match the platform's
+  // path syntax (win32 resolves "/workspace" + "subdir" to "D:\workspace\subdir").
   test("relative path resolves against current cwd", async () => {
     await withInstance(async () => {
       setCwd("/workspace")
       setCwd("subdir")
-      expect(getCwd()).toBe("/workspace/subdir")
+      expect(getCwd()).toBe(path.resolve("/workspace", "subdir"))
     })
   })
 
@@ -60,7 +62,7 @@ describe("setCwd / getCwd — unit", () => {
       setCwd("/workspace")
       setCwd("a")
       setCwd("b")
-      expect(getCwd()).toBe("/workspace/a/b")
+      expect(getCwd()).toBe(path.resolve("/workspace", "a", "b"))
     })
   })
 
@@ -68,7 +70,7 @@ describe("setCwd / getCwd — unit", () => {
     await withInstance(async () => {
       setCwd("/workspace/a/b")
       setCwd("..")
-      expect(getCwd()).toBe("/workspace/a")
+      expect(getCwd()).toBe(path.resolve("/workspace/a/b", ".."))
     })
   })
 })
@@ -105,7 +107,7 @@ describe("tool path resolution — LAC-742 regression", () => {
     await withInstance(async () => {
       setCwd("/tmp")
       expect(getCwd()).toBe("/tmp")
-      expect(path.resolve(getCwd(), "relative-file.txt")).toBe("/tmp/relative-file.txt")
+      expect(path.resolve(getCwd(), "relative-file.txt")).toBe(path.resolve("/tmp", "relative-file.txt"))
     })
   })
 
@@ -120,6 +122,45 @@ describe("tool path resolution — LAC-742 regression", () => {
         expect(getCwd()).not.toBe(tmp.path)
       },
     })
+  })
+})
+
+// LAC-2693 regression: on Windows, a shell that does not understand the
+// wrapper template echoes it literally (cmd.exe printing "$(pwd -P ...)").
+// That text must never reach setCwd — the poisoned cwd is process-wide and
+// makes every later spawn fail its cwd access check.
+describe("parseCwdSentinelPayload — LAC-2693 regression", () => {
+  test("parses exit code and posix cwd", () => {
+    expect(parseCwdSentinelPayload("0:/home/user/project")).toEqual({ exitCode: 0, cwd: "/home/user/project" })
+  })
+
+  test("parses exit code and windows drive cwd", () => {
+    expect(parseCwdSentinelPayload("1:D:\\a\\lash\\lash")).toEqual({ exitCode: 1, cwd: "D:\\a\\lash\\lash" })
+  })
+
+  test("accepts legacy payload without exit code", () => {
+    expect(parseCwdSentinelPayload("/tmp")).toEqual({ exitCode: null, cwd: "/tmp" })
+  })
+
+  test("treats non-numeric prefix with drive colon as cwd", () => {
+    expect(parseCwdSentinelPayload("D:\\foo")).toEqual({ exitCode: null, cwd: "D:\\foo" })
+  })
+
+  test("rejects unexpanded posix substitution echoed by cmd.exe", () => {
+    expect(parseCwdSentinelPayload("$__oc_exit:$(pwd -P 2>/dev/null || pwd)")).toEqual({
+      exitCode: null,
+      cwd: null,
+    })
+    expect(parseCwdSentinelPayload("0:$(pwd -P")).toEqual({ exitCode: 0, cwd: null })
+  })
+
+  test("rejects unexpanded cmd variables echoed by a posix shell", () => {
+    expect(parseCwdSentinelPayload("%ERRORLEVEL%:%CD%")).toEqual({ exitCode: null, cwd: null })
+  })
+
+  test("handles empty and cwd-less payloads", () => {
+    expect(parseCwdSentinelPayload("")).toEqual({ exitCode: null, cwd: null })
+    expect(parseCwdSentinelPayload("0:")).toEqual({ exitCode: 0, cwd: null })
   })
 })
 

@@ -36,7 +36,7 @@ import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { Shell } from "@opencode-ai/core/shell"
-import { getCwd, setCwd, detectNaturalLanguage } from "@shell-mode"
+import { getCwd, setCwd, parseCwdSentinelPayload, detectNaturalLanguage } from "@shell-mode"
 import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Truncate } from "@/tool/truncate"
@@ -627,15 +627,9 @@ export const layer = Layer.effect(
                 const afterSentinel = output.slice(sentinelIndex + cwdSentinel.length)
                 const newlineIndex = afterSentinel.indexOf("\n")
                 const payload = (newlineIndex !== -1 ? afterSentinel.slice(0, newlineIndex) : afterSentinel).trim()
-                const colonIndex = payload.indexOf(":")
-                if (colonIndex !== -1) {
-                  const code = parseInt(payload.slice(0, colonIndex), 10)
-                  if (!isNaN(code)) commandExitCode = code
-                  const newCwd = payload.slice(colonIndex + 1).trim()
-                  if (newCwd) setCwd(newCwd)
-                } else if (payload) {
-                  setCwd(payload)
-                }
+                const parsed = parseCwdSentinelPayload(payload)
+                if (parsed.exitCode !== null) commandExitCode = parsed.exitCode
+                if (parsed.cwd) setCwd(parsed.cwd)
                 cleanOutput = stripSentinel(output)
               }
 

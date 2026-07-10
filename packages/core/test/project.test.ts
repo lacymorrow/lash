@@ -12,6 +12,10 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(AppNodeBuilder.build(ProjectV2.node))
 
+// Every test spawns several git subprocesses via initRepo; on loaded
+// GitHub-hosted windows runners a single spawn can blow the 5s default.
+const GIT_SPAWN = { timeout: 30_000 }
+
 function remoteID(remote: string) {
   return ProjectV2.ID.make(Hash.fast(`git-remote:${remote}`))
 }
@@ -54,6 +58,7 @@ describe("ProjectV2.resolve", () => {
       expect(result.previous).toBeUndefined()
       expect(result.vcs).toBeUndefined()
     }),
+    GIT_SPAWN,
   )
 
   it.live("returns git global for repo with no commits and no remote", () =>
@@ -72,6 +77,7 @@ describe("ProjectV2.resolve", () => {
       expect(result.previous).toBeUndefined()
       expect(result.vcs?.type).toBe("git")
     }),
+    GIT_SPAWN,
   )
 
   it.live("falls back to root commit when origin is missing", () =>
@@ -90,6 +96,7 @@ describe("ProjectV2.resolve", () => {
       expect(result.previous).toBeUndefined()
       expect(result.vcs?.type).toBe("git")
     }),
+    GIT_SPAWN,
   )
 
   it.live("prefers normalized origin over root commit", () =>
@@ -108,6 +115,7 @@ describe("ProjectV2.resolve", () => {
       expect(result.directory).toBe(yield* real(tmp.path))
       expect(result.vcs?.type).toBe("git")
     }),
+    GIT_SPAWN,
   )
 
   it.live("normalizes ssh and https remotes to the same id", () =>
@@ -130,6 +138,7 @@ describe("ProjectV2.resolve", () => {
       expect(a.id).toBe(remoteID("github.com/owner/repo"))
       expect(b.id).toBe(a.id)
     }),
+    GIT_SPAWN,
   )
 
   it.live("ignores file remotes and falls back to root commit", () =>
@@ -145,6 +154,7 @@ describe("ProjectV2.resolve", () => {
 
       expect(result.id).toBe(ProjectV2.ID.make(yield* Effect.promise(() => rootCommit(tmp.path))))
     }),
+    GIT_SPAWN,
   )
 
   it.live("returns previous cached id from common dir", () =>
@@ -162,6 +172,7 @@ describe("ProjectV2.resolve", () => {
       expect(result.previous).toBe(ProjectV2.ID.make("old-id"))
       expect(result.id).toBe(remoteID("github.com/owner/repo"))
     }),
+    GIT_SPAWN,
   )
 
   it.live("does not write the cache while resolving", () =>
@@ -177,6 +188,7 @@ describe("ProjectV2.resolve", () => {
 
       expect(yield* Effect.promise(() => Bun.file(path.join(tmp.path, ".git", "opencode")).exists())).toBe(false)
     }),
+    GIT_SPAWN,
   )
 
   it.live("resolves from nested directories to repo root", () =>
@@ -193,6 +205,7 @@ describe("ProjectV2.resolve", () => {
 
       expect(result.directory).toBe(yield* real(tmp.path))
     }),
+    GIT_SPAWN,
   )
 
   it.live("linked worktree returns opened worktree directory and previous from common dir", () =>
@@ -217,5 +230,6 @@ describe("ProjectV2.resolve", () => {
       expect(result.id).toBe(remoteID("github.com/owner/repo"))
       expect(result.vcs?.type).toBe("git")
     }),
+    GIT_SPAWN,
   )
 })

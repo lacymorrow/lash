@@ -75,8 +75,17 @@ jobs:
           "$RUNNER_TEMP/ripgrep/rg.exe" --version
           echo "$RUNNER_TEMP/ripgrep" >> "$GITHUB_PATH"
 
+      - name: Cache downloaded tool binaries
+        # Ripgrep tests download rg into ~/.cache/opencode/bin on first use;
+        # on GitHub-hosted windows runners that download has blown the test
+        # timeout. Cache it so only version bumps re-download.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/opencode/bin
+          key: opencode-bin-${{ runner.os }}-${{ hashFiles('packages/core/src/ripgrep/binary.ts') }}
       - name: Run unit tests
-        timeout-minutes: 20
+        # opencode#test alone takes ~20 minutes on GitHub-hosted windows runners
+        timeout-minutes: 35
         run: GITHUB_ACTIONS=false bun turbo test
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}

@@ -18,7 +18,9 @@ describe("opencode acp lifecycle subprocess", () => {
         const acp = yield* opencode.acp()
         acp.close()
 
-        const code = yield* Effect.promise(() => acp.exited).pipe(Effect.timeout(Duration.seconds(5)))
+        // Generous window: on windows CI runners the CLI's bun startup alone
+        // can exceed 5s, and it only handles the stdin EOF once booted (LAC-2693)
+        const code = yield* Effect.promise(() => acp.exited).pipe(Effect.timeout(Duration.seconds(30)))
         expect(code).toBe(0)
       }),
     60_000,
