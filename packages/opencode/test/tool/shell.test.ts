@@ -1112,10 +1112,16 @@ describe("tool.shell abort", () => {
           const gate = path
             .join(os.tmpdir(), `shell-stream-gate-${process.pid}-${Math.random().toString(36).slice(2)}`)
             .replaceAll("\\", "/")
+          // String.fromCharCode keeps the eval'd code free of quote characters so it
+          // survives evalarg's quoting under every shell (bash, pwsh, cmd).
+          const js = (text: string) => `String.fromCharCode(${[...text].map((c) => c.charCodeAt(0)).join(",")})`
+          const code = `const f=require(${js("fs")});f.writeSync(1,${js("first\n")});while(!f.existsSync(Bun.argv[1]))Bun.sleepSync(50);f.writeSync(1,${js("second\n")})`
+          const text = `${bin} -e ${evalarg(code)} ${quote(gate)}`
           const updates: string[] = []
+          let gateWritten = false
           const result = yield* run(
             {
-              command: `echo first; until [ -f "${gate}" ]; do sleep 0.05; done; echo second`,
+              command: PS.has(sh()) ? `& ${text}` : text,
               timeout: 10_000,
             },
             {
@@ -1124,7 +1130,10 @@ describe("tool.shell abort", () => {
                 Effect.sync(() => {
                   const output = (input.metadata as { output?: string })?.output
                   if (output) updates.push(output)
-                  if (output?.includes("first")) fs.writeFileSync(gate, "")
+                  if (output?.includes("first") && !gateWritten) {
+                    gateWritten = true
+                    fs.writeFileSync(gate, "")
+                  }
                 }),
             },
           ).pipe(Effect.ensuring(Effect.sync(() => fs.rmSync(gate, { force: true }))))
