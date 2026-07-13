@@ -1,7 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient, path } from "@opencode-ai/core/effect/app-node-platform"
 import { NodePath } from "@effect/platform-node"
-import { Effect, Layer, Path, Schema, Context } from "effect"
+import { Effect, Layer, Path, Schedule, Schema, Context } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -33,6 +33,14 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
     const path = yield* Path.Path
     const http = HttpClient.filterStatusOk(withTransientReadRetry(yield* HttpClient.HttpClient))
     const cache = path.join(Global.Path.cache, "skills")
+
+    // Windows: Defender/indexer briefly holds handles on freshly written
+    // directories, so a single rename can fail with EPERM even though the
+    // swap is valid — retry like graceful-fs does.
+    const rename = (from: string, to: string) =>
+      process.platform === "win32"
+        ? fs.rename(from, to).pipe(Effect.retry({ times: 5, schedule: Schedule.spaced(100) }))
+        : fs.rename(from, to)
 
     const download = Effect.fn("Discovery.download")(function* (url: string, dest: string) {
       if (yield* fs.exists(dest).pipe(Effect.orDie)) return true
@@ -106,11 +114,11 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
                 yield* Effect.uninterruptible(
                   Effect.gen(function* () {
                     const cached = yield* fs.exists(root).pipe(Effect.orDie)
-                    if (cached) yield* fs.rename(root, backup)
-                    yield* fs.rename(staging, root).pipe(
+                    if (cached) yield* rename(root, backup)
+                    yield* rename(staging, root).pipe(
                       Effect.catch((error) =>
                         Effect.gen(function* () {
-                          if (cached) yield* fs.rename(backup, root).pipe(Effect.ignore)
+                          if (cached) yield* rename(backup, root).pipe(Effect.ignore)
                           return yield* Effect.fail(error)
                         }),
                       ),

@@ -116,10 +116,10 @@ describe("tool.assertExternalDirectory", () => {
           yield* Effect.promise(() => Bun.write(path.join(outerTmp, "outside.txt"), "x"))
 
           const target = path.join(outerTmp, "outside.txt")
-          const alt = target
-            .replace(/^[A-Za-z]:/, "")
-            .replaceAll("\\", "/")
-            .toLowerCase()
+          // Keep the drive letter: a drive-less absolute path resolves against
+          // the current drive, which differs from TEMP's drive on GitHub-hosted
+          // runners (repo on D:, TEMP on C:) — LAC-2693.
+          const alt = target.replaceAll("\\", "/").toLowerCase()
 
           yield* assertExternalDirectoryEffect(ctx, alt)
 

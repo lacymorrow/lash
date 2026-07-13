@@ -8,6 +8,14 @@ import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
 
+// Per-test (bun) timeout. Concurrent tests share the harness spawn gate
+// (see spawnGate in test/lib/cli-process.ts), so a test's wall clock includes
+// time queued behind other tests' subprocesses — the budget must cover the
+// whole suite's serialized throughput on a loaded CI runner, not one spawn.
+// Fail-fast for a genuinely hung subprocess comes from the per-spawn 30s
+// timeout (which starts only once the spawn holds a permit), not from this.
+const testTimeout = 120_000
+
 describe("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
   // If this fails, all the others likely will too — debug here first.
@@ -20,7 +28,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("hello from the test llm\n")
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -42,7 +50,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(result, 0)
         expect(result.stdout).toBe("before tool\nafter tool\n")
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -59,26 +67,27 @@ describe("opencode run (non-interactive subprocess)", () => {
         opencode.expectExit(plain, 0)
         expect(plain.stdout).toBe("visible\n")
       }),
-    60_000,
+    testTimeout,
   )
 
   // Regression for #27371: an unknown model used to hang the process forever
   // waiting on a session.status === idle event that never arrived. The fix
   // makes the SDK call surface an error promptly so the process exits nonzero.
   // We assert nonzero exit AND wall-clock under the harness timeout — a hang
-  // would expire the timeout and produce a different (signal-killed) failure.
+  // would run to the 30s cutoff and fail the duration assertion. The budget
+  // must absorb cold CLI startup on loaded 2-core CI runners (observed >15s).
   cliIt.concurrent(
     "exits nonzero promptly when the model is unknown (regression for #27371)",
     ({ opencode }) =>
       Effect.gen(function* () {
         const result = yield* opencode.run("say hi", {
           model: "test/nonexistent-model",
-          timeoutMs: 15_000,
+          timeoutMs: 30_000,
         })
         expect(result.exitCode).not.toBe(0)
-        expect(result.durationMs).toBeLessThan(15_000)
+        expect(result.durationMs).toBeLessThan(30_000)
       }),
-    30_000,
+    testTimeout,
   )
 
   // The test provider's SSE error item is interpreted by the SDK as an unknown
@@ -100,7 +109,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.stdout).toBe("partial response\n")
         expect(result.stderr).not.toContain("upstream provider exploded mid-stream")
       }),
-    60_000,
+    testTimeout,
   )
 
   // --format json puts one JSON object per line on stdout for each emitted
@@ -137,7 +146,7 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.length > 0),
         ).toBe(true)
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -160,7 +169,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         })
         expect(result.stdout.split("\n").filter(Boolean)).toHaveLength(1)
       }),
-    30_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -209,7 +218,7 @@ describe("opencode run (non-interactive subprocess)", () => {
             .every((line) => line.startsWith("{")),
         ).toBe(true)
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -238,7 +247,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(events[1]?.part).toEqual(expect.objectContaining({ type: "text", text: "partial json" }))
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "unknown" }))
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -274,7 +283,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(explicitlyDenied.stdout).toContain("continued after explicit denial")
         expect(yield* Effect.promise(() => Bun.file(`${home}/explicitly-denied`).exists())).toBe(false)
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.live(
@@ -296,7 +305,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(input).toContain(sentinel)
         expect(input).not.toContain(`file://${source}`)
       }),
-    60_000,
+    testTimeout,
   )
 
   cliIt.concurrent(
@@ -310,7 +319,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.stderr).toContain("Cannot attach local directory without a shared filesystem")
       }),
-    30_000,
+    testTimeout,
   )
 
   cliIt.live(
@@ -326,6 +335,6 @@ describe("opencode run (non-interactive subprocess)", () => {
         expect(result.exitCode).not.toBe(0)
         expect(result.durationMs).toBeLessThan(30_000)
       }),
-    30_000,
+    testTimeout,
   )
 })

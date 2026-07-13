@@ -31,7 +31,13 @@ export const ripgrepLayer = Layer.effect(
       files: [] as string[],
       directories: [] as string[],
     }
+    const files = new Set<string>()
     const directories = new Set<string>()
+    // The scan fills the find() index incrementally. A transient spawn failure
+    // or hung rg process would otherwise kill this forked fiber silently and
+    // leave find() empty forever (LAC-2693), so bound each attempt, retry, and
+    // log a scan that never completes. Dedupe keeps retries from re-adding
+    // entries already indexed by an interrupted attempt.
     yield* ripgrep
       .find({
         cwd: location.directory,
@@ -39,13 +45,21 @@ export const ripgrepLayer = Layer.effect(
         limit: location.vcs ? Number.MAX_SAFE_INTEGER : 100_000,
         onEntry: (entry) =>
           Effect.sync(() => {
+            if (files.has(entry.path)) return
+            files.add(entry.path)
             state.files.push(entry.path)
             const parts = entry.path.split("/")
             parts.slice(0, -1).forEach((_, index) => directories.add(parts.slice(0, index + 1).join("/") + path.sep))
             state.directories = Array.from(directories)
           }),
       })
-      .pipe(Effect.orDie, Effect.asVoid, Effect.forkIn(scope))
+      .pipe(
+        Effect.timeout("120 seconds"),
+        Effect.retry({ times: 2 }),
+        Effect.catch((error) => Effect.logWarning("file index scan failed", { error })),
+        Effect.asVoid,
+        Effect.forkIn(scope),
+      )
     return Service.of({
       glob: (input) =>
         Effect.gen(function* () {

@@ -19,7 +19,7 @@ import { getModeDisplay, getModeController, ExecutionMode } from "@shell-mode"
 //   </box>
 
 const PROMPT_SRC = readFileSync(
-  join(import.meta.dir, "../../../../src/cli/cmd/tui/component/prompt/index.tsx"),
+  join(import.meta.dir, "../../../../../tui/src/component/prompt/index.tsx"),
   "utf-8",
 )
 

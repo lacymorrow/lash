@@ -610,9 +610,8 @@ export const ShellTool = Tool.define(
           execute: (params: Parameters, ctx: Tool.Context) =>
             Effect.gen(function* () {
               const instanceCtx = yield* InstanceState.context
-              const cwd = params.workdir
-                ? yield* resolvePath(params.workdir, getCwd(), shell)
-                : getCwd()
+              const base = getCwd(instanceCtx.directory)
+              const cwd = params.workdir ? yield* resolvePath(params.workdir, base, shell) : base
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }

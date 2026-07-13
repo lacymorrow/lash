@@ -1701,7 +1701,8 @@ it.instance(
       expect(yield* llm.calls).toBe(1)
     }),
   { git: true },
-  10_000,
+  // git-fixture boot + shell spawn exceed 10s on windows runners (LAC-2693)
+  30_000,
 )
 
 it.instance(
@@ -1740,7 +1741,8 @@ it.instance(
       expect(yield* llm.calls).toBe(1)
     }),
   { git: true },
-  10_000,
+  // git-fixture boot + shell spawn exceed 10s on windows runners (LAC-2693)
+  30_000,
 )
 
 unix(

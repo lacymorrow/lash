@@ -192,10 +192,10 @@ describe("tool.read external_directory permission", () => {
 
         const { items, next } = asks()
         const target = path.join(dir, "test.txt")
-        const alt = target
-          .replace(/^[A-Za-z]:/, "")
-          .replaceAll("\\", "/")
-          .toLowerCase()
+        // Keep the drive letter: a drive-less absolute path resolves against
+        // the current drive, which differs from TEMP's drive on GitHub-hosted
+        // runners (repo on D:, TEMP on C:) — LAC-2693.
+        const alt = target.replaceAll("\\", "/").toLowerCase()
 
         yield* exec(dir, { filePath: alt }, next)
         const read = items.find((item) => item.permission === "read")

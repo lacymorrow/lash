@@ -30,6 +30,12 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
+// bootstrapFixture configures a plugin, so plugin.init() waits for the
+// background `@opencode-ai/plugin` npm install (Config.waitForDependencies).
+// That network round-trip can exceed the suite-wide 30s timeout on loaded
+// GitHub-hosted windows runners.
+const PLUGIN_INSTALL = { timeout: 120_000 }
+
 const bootstrapFixture = Effect.gen(function* () {
   const dir = yield* tmpdirScoped({ git: true })
   const marker = path.join(dir, "config-hook-fired")
@@ -76,6 +82,7 @@ it.live("InstanceStore.provide runs InstanceBootstrap before effect", () =>
 
     expect(existsSync(tmp.marker)).toBe(true)
   }),
+  PLUGIN_INSTALL,
 )
 
 it.live("CLI bootstrap runs InstanceBootstrap before callback", () =>
@@ -86,6 +93,7 @@ it.live("CLI bootstrap runs InstanceBootstrap before callback", () =>
 
     expect(existsSync(tmp.marker)).toBe(true)
   }),
+  PLUGIN_INSTALL,
 )
 
 it.live("CLI bootstrap disposes the instance when the callback rejects", () =>
@@ -101,6 +109,7 @@ it.live("CLI bootstrap disposes the instance when the callback rejects", () =>
     if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toMatchObject({ message: "boom" })
     yield* Fiber.join(disposed)
   }),
+  PLUGIN_INSTALL,
 )
 
 it.live("InstanceStore.reload runs InstanceBootstrap", () =>
@@ -112,4 +121,5 @@ it.live("InstanceStore.reload runs InstanceBootstrap", () =>
 
     expect(existsSync(tmp.marker)).toBe(true)
   }),
+  PLUGIN_INSTALL,
 )

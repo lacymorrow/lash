@@ -13,7 +13,8 @@ import type { Config } from "@/config/config"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceRef } from "../../src/effect/instance-ref"
 import { InstanceBootstrap } from "../../src/project/bootstrap-service"
-import type { InstanceContext } from "../../src/project/instance-context"
+import { context as instanceContext, type InstanceContext } from "../../src/project/instance-context"
+import { resetCwd } from "@shell-mode"
 import { InstanceRuntime } from "../../src/project/instance-runtime"
 import { InstanceStore } from "../../src/project/instance-store"
 import { TestLLMServer } from "../lib/llm-server"
@@ -31,7 +32,9 @@ export async function provideTestInstance<R>(input: {
   const ctx = await InstanceRuntime.load({ directory: input.directory })
   try {
     if (input.init) await Effect.runPromise(input.init.pipe(Effect.provideService(InstanceRef, ctx)))
-    return await input.fn(ctx)
+    // Enter the ambient instance context like production `bootstrap()` does,
+    // so code that reads it (e.g. shell-mode getCwd/setCwd) sees the test instance.
+    return await instanceContext.provide(ctx, () => input.fn(ctx))
   } finally {
     await InstanceRuntime.disposeInstance(ctx)
   }
@@ -207,6 +210,12 @@ export const withTmpdirInstance =
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
       const directory = yield* tmpdirScoped(options)
+      // Shell-mode cwd is a module singleton; clear any cwd left by a previous
+      // test so commands run in this instance's directory, not a disposed tmpdir.
+      yield* Effect.acquireRelease(
+        Effect.sync(() => resetCwd()),
+        () => Effect.sync(() => resetCwd()),
+      )
       return yield* self.pipe(Effect.provideService(TestInstance, { directory }), provideInstanceEffect(directory))
     }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 

@@ -15,7 +15,8 @@
     },
     "@opencode-ai/core#test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "passThroughEnv": ["*"]
     },
     "@opencode-ai/app#test": {
       "dependsOn": ["^build"],

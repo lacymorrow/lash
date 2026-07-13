@@ -19,6 +19,10 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([ProjectCopy.node, Database.node, EventV2.node, ProjectDirectories.node])),
+  // These tests chain many git subprocess ops; on GitHub-hosted Windows
+  // runners each op costs 100ms-2.8s under full-suite load, exceeding bun's
+  // 5s default per-test timeout (LAC-2717).
+  { timeout: 30_000 },
 )
 
 function abs(input: string) {

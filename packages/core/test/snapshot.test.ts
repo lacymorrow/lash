@@ -12,8 +12,13 @@ import { Hash } from "@opencode-ai/core/util/hash"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
+// These tests chain many git subprocess ops; on GitHub-hosted Windows
+// runners each op costs 100ms-2.8s under full-suite load, exceeding bun's
+// 5s default per-test timeout (LAC-2717).
+const it = testEffect(Layer.empty, { timeout: 30_000 })
+
 describe("Snapshot", () => {
-  testEffect(Layer.empty).live("captures and restores Location-scoped changes", () =>
+  it.live("captures and restores Location-scoped changes", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),
       (tmp) =>
@@ -67,7 +72,7 @@ describe("Snapshot", () => {
     ),
   )
 
-  testEffect(Layer.empty).live("treats capture outside Git as unavailable", () =>
+  it.live("treats capture outside Git as unavailable", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),
       (tmp) =>
@@ -83,7 +88,7 @@ describe("Snapshot", () => {
     ),
   )
 
-  testEffect(Layer.empty).live("isolates snapshot indexes by canonical Git worktree", () =>
+  it.live("isolates snapshot indexes by canonical Git worktree", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),
       (tmp) =>
@@ -129,7 +134,7 @@ describe("Snapshot", () => {
     ),
   )
 
-  testEffect(Layer.empty).live("checks out a legacy revert snapshot without removing unrelated files", () =>
+  it.live("checks out a legacy revert snapshot without removing unrelated files", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),
       (tmp) =>
