@@ -2,6 +2,7 @@ import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer } from "effect"
 import type * as Scope from "effect/Scope"
+import fs from "fs"
 import os from "os"
 import path from "path"
 import { Config } from "@/config/config"
@@ -1100,29 +1101,39 @@ describe("tool.shell abort", () => {
     ),
   )
 
-  it.live("streams metadata updates progressively", () =>
-    runIn(
-      projectRoot,
-      Effect.gen(function* () {
-        const updates: string[] = []
-        const result = yield* run(
-          {
-            command: `echo first && sleep 0.1 && echo second`,
-          },
-          {
-            ...ctx,
-            metadata: (input) =>
-              Effect.sync(() => {
-                const output = (input.metadata as { output?: string })?.output
-                if (output) updates.push(output)
-              }),
-          },
-        )
-        expect(result.output).toContain("first")
-        expect(result.output).toContain("second")
-        expect(updates.length).toBeGreaterThan(1)
-      }),
-    ),
+  it.live(
+    "streams metadata updates progressively",
+    () =>
+      runIn(
+        projectRoot,
+        Effect.gen(function* () {
+          // The second chunk is gated on the test observing the first update, so the
+          // two writes can never coalesce into a single flush under runner load.
+          const gate = path
+            .join(os.tmpdir(), `shell-stream-gate-${process.pid}-${Math.random().toString(36).slice(2)}`)
+            .replaceAll("\\", "/")
+          const updates: string[] = []
+          const result = yield* run(
+            {
+              command: `echo first; until [ -f "${gate}" ]; do sleep 0.05; done; echo second`,
+              timeout: 10_000,
+            },
+            {
+              ...ctx,
+              metadata: (input) =>
+                Effect.sync(() => {
+                  const output = (input.metadata as { output?: string })?.output
+                  if (output) updates.push(output)
+                  if (output?.includes("first")) fs.writeFileSync(gate, "")
+                }),
+            },
+          ).pipe(Effect.ensuring(Effect.sync(() => fs.rmSync(gate, { force: true }))))
+          expect(result.output).toContain("first")
+          expect(result.output).toContain("second")
+          expect(updates.length).toBeGreaterThan(1)
+        }),
+      ),
+    15_000,
   )
 })
 
