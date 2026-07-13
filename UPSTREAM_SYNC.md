@@ -305,9 +305,9 @@ These features must always be preserved through upstream merges:
 | `handleModeToggleKey()` | `plugin/tui-integration/hooks.ts` | ctrl+space handler |
 | `determineRouting()` | `plugin/tui-integration/hooks.ts` | Shell vs agent routing |
 | `cwd sentinel` in bash | `src/session/prompt.ts` | Cwd tracking after cd |
-| `mode_toggle` keybind | `src/config/config.ts` | ctrl+space default |
-| `agent_cycle` keybind | `src/config/keybinds.ts` | shift+tab (NOT tab) |
-| Double left border | `component/prompt/index.tsx` | Row layout, not nested |
+| ctrl+space mode toggle | `packages/tui/src/component/prompt/index.tsx` (`prompt.mode.toggle` binding) | replaced `mode_toggle` keybind after 2026-07-07 TUI move |
+| `agent_cycle` keybind | `packages/tui/src/config/keybind.ts` | shift+tab (NOT tab) |
+| Double left border | `packages/tui/src/component/prompt/index.tsx` | Row layout, not nested |
 | `EventCwdUpdated` | `sdk/js/src/v2/gen/types.gen.ts` | SDK type for cwd event |
 | cwd in `path.*` field | `src/session/prompt.ts` | Shows cwd in messages |
 
@@ -357,3 +357,7 @@ For conflict-free or simple merges, this can be fully automated. Conflicted merg
 |------|------------------------|-----------|-------|
 | 2026-04-02 | 673 (cf7ca9b2f → 92e820fdc) | 28 files | Major Effect rewrite of prompt.ts |
 | 2026-04-28 | (QA only — no new merge) | — | LAC-163: found 3 regressions post-merge: missing double border, wrong Tab keybind, border height mismatch. Fixed in commits bde00fa30, 85faf49fc, 9d7ac27c1. Added this QA checklist. |
+| 2026-06-26 | 629 (catch-up) | — | PR #31 merged. |
+| 2026-06-30 | 68 | escalated → LAC-2496 | PR #32 opened; later superseded by PR #39. |
+| 2026-07-07 | 195 (→ v1.17.15) | prompt/index.tsx re-architecture | LAC-2556: merge completed on-branch; run died in API outage before PR. mode_toggle/handleModeToggleKey replaced by direct ctrl+space `prompt.mode.toggle` binding; TUI moved to `packages/tui/`. |
+| 2026-07-13 | 90 (→ v1.17.18) | 15 version bumps, TEAM_MEMBERS, 1 hunk in prompt/index.tsx | LAC-2739: consolidated PR #39 (06-30 + 07-07 + 07-13). Kept lash `shortenedWorkingDir` footer over upstream's session-directory display. Typecheck 30/30. |
