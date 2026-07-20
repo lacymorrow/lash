@@ -361,3 +361,4 @@ For conflict-free or simple merges, this can be fully automated. Conflicted merg
 | 2026-06-30 | 68 | escalated → LAC-2496 | PR #32 opened; later superseded by PR #39. |
 | 2026-07-07 | 195 (→ v1.17.15) | prompt/index.tsx re-architecture | LAC-2556: merge completed on-branch; run died in API outage before PR. mode_toggle/handleModeToggleKey replaced by direct ctrl+space `prompt.mode.toggle` binding; TUI moved to `packages/tui/`. |
 | 2026-07-13 | 90 (→ v1.17.18) | 15 version bumps, TEAM_MEMBERS, 1 hunk in prompt/index.tsx | LAC-2739: consolidated PR #39 (06-30 + 07-07 + 07-13). Kept lash `shortenedWorkingDir` footer over upstream's session-directory display. Typecheck 30/30. |
+| 2026-07-20 | 153 (→ v1.18.3) | 15 version bumps, bun.lock | LAC-2865: merged into PR #39 branch (dev still awaiting PR #39 merge). Also merged origin/dev (PR #40 Windows deflake). No complex conflicts; invariants verified. |
