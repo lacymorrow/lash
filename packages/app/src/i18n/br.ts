@@ -86,6 +86,7 @@ export const dict = {
   "command.session.unshare": "Parar de compartilhar sessão",
   "command.session.unshare.description": "Parar de compartilhar esta sessão",
   "palette.search.placeholder": "Buscar arquivos, comandos e sessões",
+  "palette.search.placeholder.home": "Buscar comandos e sessões",
   "palette.empty": "Nenhum resultado encontrado",
   "palette.group.commands": "Comandos",
   "palette.group.files": "Arquivos",
@@ -618,6 +619,7 @@ export const dict = {
   "session.new.workspace.triggerLocal": "Local",
   "session.new.workspace.local": "Repositório local",
   "session.new.workspace.existing": "Espaço de trabalho…",
+  "session.new.git.none": "Sem Git",
   "session.new.lastModified": "Última modificação",
   "session.header.search.placeholder": "Buscar {{project}}",
   "session.header.searchFiles": "Buscar arquivos",
@@ -746,10 +748,13 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.title": "Expandir partes da ferramenta de edição",
   "settings.general.row.editToolPartsExpanded.description":
     "Mostrar partes das ferramentas de edição, escrita e patch expandidas por padrão na linha do tempo",
-  "settings.general.row.newInterface.title": "Usar a nova interface",
+  "settings.general.row.newInterface.title": "Novo layout",
   "settings.general.row.newInterface.badge": "Novo",
   "settings.general.row.newInterface.description":
-    "Layout, abas, área de composição e página inicial reformulados. A interface anterior será removida em {{date}}.",
+    "Use as novas abas e o layout da página inicial. Alterne entre os layouts por tempo limitado.",
+  "settings.general.row.newInterfaceNotice.title": "Agora você está usando o novo layout",
+  "settings.general.row.newInterfaceNotice.description": "O layout anterior não está mais disponível",
+  "settings.general.row.newInterfaceNotice.dismiss": "Descartar",
   "settings.general.row.pinchZoom.title": "Zoom com gesto de pinça",
   "settings.general.row.pinchZoom.description":
     "Permitir gestos de pinça no trackpad e de Ctrl+rolagem para aplicar zoom",

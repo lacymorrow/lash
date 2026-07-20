@@ -93,6 +93,7 @@ export const dict = {
   "command.session.unshare.description": "Dejar de compartir esta sesión",
 
   "palette.search.placeholder": "Buscar archivos, comandos y sesiones",
+  "palette.search.placeholder.home": "Buscar comandos y sesiones",
   "palette.empty": "No se encontraron resultados",
   "palette.group.commands": "Comandos",
   "palette.group.files": "Archivos",
@@ -675,6 +676,7 @@ export const dict = {
   "session.new.workspace.triggerLocal": "Local",
   "session.new.workspace.local": "Repositorio local",
   "session.new.workspace.existing": "Espacio de trabajo…",
+  "session.new.git.none": "Sin Git",
   "session.new.lastModified": "Última modificación",
 
   "session.header.search.placeholder": "Buscar {{project}}",
@@ -816,10 +818,13 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.title": "Expandir partes de la herramienta de edición",
   "settings.general.row.editToolPartsExpanded.description":
     "Mostrar las partes de las herramientas de edición, escritura y parcheado expandidas por defecto en la línea de tiempo",
-  "settings.general.row.newInterface.title": "Usar la nueva interfaz",
+  "settings.general.row.newInterface.title": "Nuevo diseño",
   "settings.general.row.newInterface.badge": "Nuevo",
   "settings.general.row.newInterface.description":
-    "Un diseño renovado con pestañas, editor y nueva página de inicio. La interfaz anterior desaparecerá el {{date}}.",
+    "Usa las nuevas pestañas y el diseño de la página de inicio. Durante un tiempo limitado, puedes cambiar entre los diseños.",
+  "settings.general.row.newInterfaceNotice.title": "Ahora estás usando el nuevo diseño",
+  "settings.general.row.newInterfaceNotice.description": "El diseño anterior ya no está disponible",
+  "settings.general.row.newInterfaceNotice.dismiss": "Descartar",
   "settings.general.row.pinchZoom.title": "Pellizcar para ampliar",
   "settings.general.row.pinchZoom.description":
     "Permitir ampliar con el gesto de pellizco del panel táctil y con Ctrl-scroll",

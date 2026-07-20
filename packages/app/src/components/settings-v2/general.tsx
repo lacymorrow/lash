@@ -1,6 +1,5 @@
 import { Component, Show, createMemo, createResource, onMount } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
-import { Tag } from "@opencode-ai/ui/v2/badge-v2"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
@@ -22,7 +21,6 @@ import {
   sansInput,
   terminalDefault,
   terminalFontFamily,
-  oldInterfaceSunset,
   terminalInput,
   useSettings,
 } from "@/context/settings"
@@ -30,6 +28,7 @@ import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
 import { Link } from "../link"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
+import { LayoutRetirementNotice, LayoutTransitionToggle } from "./interface-transition"
 import "./settings-v2.css"
 
 let demoSoundState = {
@@ -229,55 +228,28 @@ export const SettingsGeneralV2: Component<{
   })
 
   const InterfaceSection = () => (
-    <div class="settings-v2-section">
-      <div class="settings-v2-interface-feature">
-        <SettingsListV2>
-          <SettingsRowV2
-            title={
-              <span class="flex items-center gap-2">
-                {language.t("settings.general.row.newInterface.title")}
-                <Tag variant="accent">{language.t("settings.general.row.newInterface.badge")}</Tag>
-              </span>
-            }
-            description={language.t("settings.general.row.newInterface.description", {
-              date: new Intl.DateTimeFormat(language.intl(), { month: "long", day: "numeric" }).format(
-                oldInterfaceSunset,
-              ),
-            })}
-          >
-            <div data-action="settings-new-layout-designs">
-              <Switch
-                checked={settings.general.newLayoutDesigns()}
-                onChange={(checked) => {
-                  settings.general.setNewLayoutDesigns(checked)
-                  if (checked) return
-                  void import("@/components/dialog-settings").then((module) => {
-                    void dialog.show(() => <module.DialogSettings />)
-                  })
-                }}
-              />
-            </div>
-          </SettingsRowV2>
-        </SettingsListV2>
-      </div>
+    <LayoutTransitionToggle
+      title={language.t("settings.general.row.newInterface.title")}
+      badge={language.t("settings.general.row.newInterface.badge")}
+      description={language.t("settings.general.row.newInterface.description")}
+      checked={settings.general.newLayoutDesigns()}
+      onChange={(checked) => {
+        settings.general.setNewLayoutDesigns(checked)
+        if (checked) return
+        void import("@/components/dialog-settings").then((module) => {
+          void dialog.show(() => <module.DialogSettings />)
+        })
+      }}
+    />
+  )
 
-      <Show when={!settings.general.newInterfaceNoticeDismissed()}>
-        <SettingsListV2>
-          <SettingsRowV2
-            title={language.t("settings.general.row.newInterfaceNotice.title")}
-            description={language.t("settings.general.row.newInterfaceNotice.description", {
-              date: new Intl.DateTimeFormat(language.intl(), { month: "long", day: "numeric" }).format(
-                oldInterfaceSunset,
-              ),
-            })}
-          >
-            <ButtonV2 size="small" variant="ghost-muted" onClick={settings.general.dismissNewInterfaceNotice}>
-              {language.t("settings.general.row.newInterfaceNotice.dismiss")}
-            </ButtonV2>
-          </SettingsRowV2>
-        </SettingsListV2>
-      </Show>
-    </div>
+  const InterfaceNoticeSection = () => (
+    <LayoutRetirementNotice
+      title={language.t("settings.general.row.newInterfaceNotice.title")}
+      description={language.t("settings.general.row.newInterfaceNotice.description")}
+      dismiss={language.t("settings.general.row.newInterfaceNotice.dismiss")}
+      onDismiss={settings.general.dismissNewInterfaceNotice}
+    />
   )
 
   const GeneralSection = () => (
@@ -719,8 +691,12 @@ export const SettingsGeneralV2: Component<{
       </div>
 
       <div class="settings-v2-tab-body">
-        <Show when={Date.now() < oldInterfaceSunset.getTime()}>
+        <Show when={settings.general.layoutTransitionAvailable()}>
           <InterfaceSection />
+        </Show>
+
+        <Show when={settings.general.newInterfaceNoticeVisible()}>
+          <InterfaceNoticeSection />
         </Show>
 
         <GeneralSection />
