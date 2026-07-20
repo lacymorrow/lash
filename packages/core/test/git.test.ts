@@ -10,7 +10,11 @@ import { branch, commit, gitRemote } from "./fixture/git"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(LayerNode.compile(Git.node))
+// These tests spawn real git subprocesses (init, clone, worktree add,
+// diff/tree writes). On GitHub-hosted Windows runners each op costs
+// 100ms-2.8s under full-suite load, exceeding bun's 5s default per-test
+// timeout (LAC-2770 clone timeout; same shape as LAC-2717).
+const it = testEffect(LayerNode.compile(Git.node), { timeout: 30_000 })
 
 describe("Git", () => {
   it.live("clones a remote and reads checkout metadata", () =>
