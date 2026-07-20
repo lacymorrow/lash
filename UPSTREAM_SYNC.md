@@ -247,10 +247,18 @@ Tab is handled in `onKeyDown` in `prompt/index.tsx` via `handleShellTabCompletio
 
 ### 13. `bun.lock`
 
-**Resolution**: Always regenerate after resolving all `package.json` conflicts:
+**Resolution**: Do NOT run `bun install` while the lockfile still contains conflict markers — bun silently re-resolves every `^`-ranged dependency, floating packages far past what either side pinned. (2026-07-20: this floated `storybook-solidjs-vite` 10.1.1 → 10.6.0, whose new Solid-version detection broke the storybook CI build and OOM'd local builds.)
+
+Instead, restore a clean base lockfile first, then install:
 ```bash
-bun install
+git checkout HEAD -- bun.lock   # pre-merge lash lockfile (or upstream/dev -- bun.lock if theirs is closer)
+bun install                      # only resolves the actual package.json deltas
 git add bun.lock
+```
+
+Then verify nothing unexpected floated:
+```bash
+git diff --cached bun.lock | grep -E '^[+-]' | grep -vE 'workspace:|1\.7\.' | head -50
 ```
 
 ---
