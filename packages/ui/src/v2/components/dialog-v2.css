@@ -59,6 +59,7 @@
           margin: 0;
           flex: 1;
           min-width: 0;
+          user-select: none;
           font-weight: 530;
           font-size: 13px;
           line-height: 16px;
@@ -80,6 +81,7 @@
           margin: 0;
           flex: none;
           flex-grow: 0;
+          user-select: none;
           font-weight: 530;
           font-size: 15px;
           line-height: 20px;
@@ -91,6 +93,7 @@
         [data-slot="dialog-description"] {
           flex: none;
           flex-grow: 0;
+          user-select: none;
           font-weight: 440;
           font-size: 13px;
           line-height: 20px;
@@ -106,8 +109,8 @@
           width: 20px;
           height: 20px;
           margin-top: -2px;
-          margin-right: -2px;
-          margin-left: auto;
+          margin-inline-end: -2px;
+          margin-inline-start: auto;
           border-radius: 4px;
           flex-shrink: 0;
           cursor: pointer;
