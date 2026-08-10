@@ -96,7 +96,7 @@
     },
     "packages/cli": {
       "name": "@opencode-ai/cli",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "bin": {
         "lildax": "./bin/lildax.cjs",
       },
@@ -144,7 +144,7 @@
     },
     "packages/codemode": {
       "name": "@opencode-ai/codemode",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "acorn": "8.15.0",
         "effect": "catalog:",
@@ -267,7 +267,7 @@
     },
     "packages/console/support": {
       "name": "@opencode-ai/console-support",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@cloudflare/vite-plugin": "1.15.2",
         "@opencode-ai/console-core": "workspace:*",
@@ -287,7 +287,7 @@
     },
     "packages/core": {
       "name": "@opencode-ai/core",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "bin": {
         "opencode": "./bin/opencode",
       },
@@ -435,7 +435,7 @@
     },
     "packages/effect-drizzle-sqlite": {
       "name": "@opencode-ai/effect-drizzle-sqlite",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "drizzle-orm": "catalog:",
         "effect": "catalog:",
@@ -449,7 +449,7 @@
     },
     "packages/effect-sqlite-node": {
       "name": "@opencode-ai/effect-sqlite-node",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "effect": "catalog:",
       },
@@ -509,7 +509,7 @@
     },
     "packages/http-recorder": {
       "name": "@opencode-ai/http-recorder",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@effect/platform-node": "4.0.0-beta.83",
         "@effect/platform-node-shared": "4.0.0-beta.83",
@@ -540,7 +540,7 @@
     },
     "packages/llm": {
       "name": "@opencode-ai/llm",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@opencode-ai/schema": "workspace:*",
         "@smithy/eventstream-codec": "4.2.14",
@@ -781,7 +781,7 @@
     },
     "packages/server": {
       "name": "@opencode-ai/server",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@opencode-ai/core": "workspace:*",
         "@opencode-ai/protocol": "workspace:*",
@@ -796,7 +796,7 @@
     },
     "packages/session-ui": {
       "name": "@opencode-ai/session-ui",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@kobalte/core": "catalog:",
         "@opencode-ai/client": "file:../app/vendor/opencode-ai-client-1.17.13-v2.tgz",
@@ -849,7 +849,7 @@
     },
     "packages/stats/app": {
       "name": "@opencode-ai/stats-app",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@ibm/plex": "6.4.1",
         "@kobalte/core": "catalog:",
@@ -883,7 +883,7 @@
     },
     "packages/stats/core": {
       "name": "@opencode-ai/stats-core",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@aws-sdk/client-athena": "3.933.0",
         "@planetscale/database": "1.19.0",
@@ -902,7 +902,7 @@
     },
     "packages/stats/server": {
       "name": "@opencode-ai/stats-server",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@aws-sdk/client-firehose": "3.933.0",
         "@effect/platform-node": "catalog:",
@@ -944,7 +944,7 @@
     },
     "packages/tui": {
       "name": "@opencode-ai/tui",
-      "version": "1.18.13",
+      "version": "1.18.16",
       "dependencies": {
         "@opencode-ai/core": "workspace:*",
         "@opencode-ai/plugin": "workspace:*",
@@ -1078,6 +1078,7 @@
     "@ai-sdk/google@3.0.73": "patches/@ai-sdk%2Fgoogle@3.0.73.patch",
     "pacote@21.5.0": "patches/pacote@21.5.0.patch",
     "@dnd-kit/dom@0.5.0": "patches/@dnd-kit%2Fdom@0.5.0.patch",
+    "@ai-sdk/openai-compatible@2.0.41": "patches/@ai-sdk%2Fopenai-compatible@2.0.41.patch",
   },
   "overrides": {
     "@opentui/core": "catalog:",
