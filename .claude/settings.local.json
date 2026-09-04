@@ -1,29 +1,46 @@
 {
   "permissions": {
     "allow": [
-      "Bash(go install:*)",
-      "Bash(lash:*)",
-      "Read(//Users/lacy/.nvm/versions/node/v22.18.0/lib/node_modules/lash-cli/**)",
-      "Bash(npm run build:*)",
-      "Bash(npm run:*)",
-      "Bash(find:*)",
-      "Bash(bun run:*)",
       "Bash(./dist/lash-darwin-arm64:*)",
       "Bash(./packages/opencode/dist/lash-darwin-arm64 --version)",
+      "Bash(/Users/lacy/go/bin/lash:*)",
+      "Bash(/Users/lacy/repo/lash/scripts/paperclip-issue-update.sh:*)",
+      "Bash(/Users/lacy/repo/lash/scripts/paperclip:*)",
+      "Bash(brew info:*)",
+      "Bash(brew install:*)",
+      "Bash(brew list:*)",
+      "Bash(bun run:*)",
+      "Bash(curl:*)",
+      "Bash(echo $PATH)",
+      "Bash(env)",
+      "Bash(env:*)",
+      "Bash(export:*)",
+      "Bash(find:*)",
+      "Bash(git -C /Users/lacy/repo/lash status)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Read(//Users/lacy/go/bin/**)",
-      "Bash(/Users/lacy/go/bin/lash:*)",
+      "Bash(go install:*)",
+      "Bash(lash:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run:*)",
       "Bash(npm uninstall:*)",
-      "Bash(echo $PATH)",
-      "Bash(export:*)",
-      "Bash(brew install:*)",
-      "Bash(brew list:*)",
-      "Bash(brew info:*)",
-      "Bash(git -C /Users/lacy/repo/lash status)"
+      "Read(//Users/lacy/.nvm/versions/node/v22.18.0/lib/node_modules/lash-cli/**)",
+      "Read(//Users/lacy/go/bin/**)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "/Users/lacy/.paperclip/instances/default/companies/18a87342-5b53-46fa-8d3f-5b25ebfa211d",
+      "/Users/lacy/.paperclip/instances/default/companies/18a87342-5b53-46fa-8d3f-5b25ebfa211d/acp-engine/agents/5487899a-f6be-4cfc-84fd-fa11ba184245",
+      "/Users/lacy/.paperclip/instances/default/companies/18a87342-5b53-46fa-8d3f-5b25ebfa211d/acp-engine/agents/604a5510-e45f-4fa8-b9e6-285279862db0",
+      "/Users/lacy/.paperclip/instances/default/companies/18a87342-5b53-46fa-8d3f-5b25ebfa211d/acp-engine/agents/62560ff0-47d5-4e77-aad1-ac7676296ecd",
+      "/Users/lacy/.paperclip/instances/default/companies/18a87342-5b53-46fa-8d3f-5b25ebfa211d/acp-engine/agents/89c8b140-80bc-4622-ad4d-1da69ce35096",
+      "/Users/lacy/.paperclip/instances/default/workspaces/5487899a-f6be-4cfc-84fd-fa11ba184245",
+      "/Users/lacy/.paperclip/instances/default/workspaces/604a5510-e45f-4fa8-b9e6-285279862db0",
+      "/Users/lacy/.paperclip/instances/default/workspaces/62560ff0-47d5-4e77-aad1-ac7676296ecd",
+      "/Users/lacy/.paperclip/instances/default/workspaces/89c8b140-80bc-4622-ad4d-1da69ce35096"
+    ],
+    "defaultMode": "default"
   }
 }
