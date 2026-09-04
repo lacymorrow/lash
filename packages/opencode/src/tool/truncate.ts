@@ -1,15 +1,14 @@
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { NodePath } from "@effect/platform-node"
-import { Cause, Duration, Effect, Layer, Schedule, Context } from "effect"
+import { Cause, Duration, Effect, Layer, Option, Schedule, Context } from "effect"
 import path from "path"
 import type { Agent } from "../agent/agent"
-import { AppFileSystem } from "@opencode-ai/shared/filesystem"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { evaluate } from "@/permission/evaluate"
-import { Identifier } from "../id/id"
-import { Log } from "../util"
+import { Config } from "@/config/config"
 import { ToolID } from "./schema"
 import { TRUNCATION_DIR } from "./truncation-dir"
 
-const log = Log.create({ service: "truncation" })
 const RETENTION = Duration.days(7)
 
 export const MAX_LINES = 2000
@@ -38,26 +37,31 @@ export interface Interface {
    * to the truncation directory and returns a preview plus a hint to inspect the saved file.
    */
   readonly output: (text: string, options?: Options, agent?: Agent.Info) => Effect.Effect<Result>
+  /**
+   * Resolved truncation limits: values from `tool_output` in opencode config, or MAX_LINES / MAX_BYTES if unset.
+   */
+  readonly limits: () => Effect.Effect<{ maxLines: number; maxBytes: number }>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Truncate") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const fs = yield* AppFileSystem.Service
+    const fs = yield* FSUtil.Service
 
     const cleanup = Effect.fn("Truncate.cleanup")(function* () {
-      const cutoff = Identifier.timestamp(
-        Identifier.create("tool", "ascending", Date.now() - Duration.toMillis(RETENTION)),
-      )
+      const cutoff = Date.now() - Duration.toMillis(RETENTION)
       const entries = yield* fs.readDirectory(TRUNCATION_DIR).pipe(
         Effect.map((all) => all.filter((name) => name.startsWith("tool_"))),
         Effect.catch(() => Effect.succeed([])),
       )
       for (const entry of entries) {
-        if (Identifier.timestamp(entry) >= cutoff) continue
-        yield* fs.remove(path.join(TRUNCATION_DIR, entry)).pipe(Effect.catch(() => Effect.void))
+        const file = path.join(TRUNCATION_DIR, entry)
+        const info = yield* fs.stat(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        const mtime = info && Option.getOrUndefined(info.mtime)
+        if (!mtime || mtime.getTime() >= cutoff) continue
+        yield* fs.remove(file).pipe(Effect.catch(() => Effect.void))
       }
     })
 
@@ -68,9 +72,20 @@ export const layer = Layer.effect(
       return file
     })
 
+    const limits = Effect.fn("Truncate.limits")(function* () {
+      const configSvc = yield* Effect.serviceOption(Config.Service)
+      if (Option.isNone(configSvc)) return { maxLines: MAX_LINES, maxBytes: MAX_BYTES }
+      const cfg = yield* configSvc.value.get().pipe(Effect.catch(() => Effect.succeed(undefined)))
+      return {
+        maxLines: cfg?.tool_output?.max_lines ?? MAX_LINES,
+        maxBytes: cfg?.tool_output?.max_bytes ?? MAX_BYTES,
+      }
+    })
+
     const output = Effect.fn("Truncate.output")(function* (text: string, options: Options = {}, agent?: Agent.Info) {
-      const maxLines = options.maxLines ?? MAX_LINES
-      const maxBytes = options.maxBytes ?? MAX_BYTES
+      const resolved = yield* limits()
+      const maxLines = options.maxLines ?? resolved.maxLines
+      const maxBytes = options.maxBytes ?? resolved.maxBytes
       const direction = options.direction ?? "head"
       const lines = text.split("\n")
       const totalBytes = Buffer.byteLength(text, "utf-8")
@@ -126,17 +141,16 @@ export const layer = Layer.effect(
     })
 
     yield* cleanup().pipe(
-      Effect.catchCause((cause) => {
-        log.error("truncation cleanup failed", { cause: Cause.pretty(cause) })
-        return Effect.void
-      }),
+      Effect.catchCause((cause) => Effect.logError("truncation cleanup failed", { cause: Cause.pretty(cause) })),
       Effect.repeat(Schedule.spaced(Duration.hours(1))),
       Effect.delay(Duration.minutes(1)),
       Effect.forkScoped,
     )
 
-    return Service.of({ cleanup, write, output })
+    return Service.of({ cleanup, write, output, limits })
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer), Layer.provide(NodePath.layer))
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [FSUtil.node] })
+
+export * as Truncate from "./truncate"

@@ -1,17 +1,4 @@
-import { Schema } from "effect"
-import z from "zod"
+import { QuestionV1 } from "@opencode-ai/schema/question-v1"
 
-import { Identifier } from "@/id/id"
-import { ZodOverride } from "@/util/effect-zod"
-import { Newtype } from "@/util/schema"
-
-export class QuestionID extends Newtype<QuestionID>()(
-  "QuestionID",
-  Schema.String.annotate({ [ZodOverride]: Identifier.schema("question") }),
-) {
-  static ascending(id?: string): QuestionID {
-    return this.make(Identifier.ascending("question", id))
-  }
-
-  static readonly zod = Identifier.schema("question") as unknown as z.ZodType<QuestionID>
-}
+export const QuestionID = QuestionV1.ID
+export type QuestionID = typeof QuestionID.Type

@@ -1,29 +1,25 @@
 import path from "path"
 import { describe, expect, test } from "bun:test"
 import { fileURLToPath } from "url"
-import { Instance } from "../../src/project/instance"
-import { Log } from "../../src/util"
-import { Session } from "../../src/session"
+import { Session } from "../../src/session/session"
 import { SessionPrompt } from "../../src/session/prompt"
-import { AppRuntime } from "../../src/effect/app-runtime"
-import { tmpdir } from "../fixture/fixture"
-
-void Log.init({ print: false })
+import { runTestApp } from "../fixture/app"
+import { provideTestInstance, tmpdir } from "../fixture/fixture"
 
 function sessionCreate(input?: Session.CreateInput) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.create(input)))
+  return runTestApp(Session.Service.use((svc) => svc.create(input)))
 }
 
 function sessionRemove(id: Session.Info["id"]) {
-  return AppRuntime.runPromise(Session.Service.use((svc) => svc.remove(id)))
+  return runTestApp(Session.Service.use((svc) => svc.remove(id)))
 }
 
 function resolvePromptParts(template: string) {
-  return AppRuntime.runPromise(SessionPrompt.Service.use((svc) => svc.resolvePromptParts(template)))
+  return runTestApp(SessionPrompt.Service.use((svc) => svc.resolvePromptParts(template)))
 }
 
 function sessionPrompt(input: SessionPrompt.PromptInput) {
-  return AppRuntime.runPromise(SessionPrompt.Service.use((svc) => svc.prompt(input)))
+  return runTestApp(SessionPrompt.Service.use((svc) => svc.prompt(input)))
 }
 
 describe("session.prompt special characters", () => {
@@ -35,7 +31,7 @@ describe("session.prompt special characters", () => {
       },
     })
 
-    await Instance.provide({
+    await provideTestInstance({
       directory: tmp.path,
       fn: async () => {
         const session = await sessionCreate({})

@@ -247,10 +247,18 @@ Tab is handled in `onKeyDown` in `prompt/index.tsx` via `handleShellTabCompletio
 
 ### 13. `bun.lock`
 
-**Resolution**: Always regenerate after resolving all `package.json` conflicts:
+**Resolution**: Do NOT run `bun install` while the lockfile still contains conflict markers — bun silently re-resolves every `^`-ranged dependency, floating packages far past what either side pinned. (2026-07-20: this floated `storybook-solidjs-vite` 10.1.1 → 10.6.0, whose new Solid-version detection broke the storybook CI build and OOM'd local builds.)
+
+Instead, restore a clean base lockfile first, then install:
 ```bash
-bun install
+git checkout HEAD -- bun.lock   # pre-merge lash lockfile (or upstream/dev -- bun.lock if theirs is closer)
+bun install                      # only resolves the actual package.json deltas
 git add bun.lock
+```
+
+Then verify nothing unexpected floated:
+```bash
+git diff --cached bun.lock | grep -E '^[+-]' | grep -vE 'workspace:|1\.7\.' | head -50
 ```
 
 ---
@@ -305,9 +313,9 @@ These features must always be preserved through upstream merges:
 | `handleModeToggleKey()` | `plugin/tui-integration/hooks.ts` | ctrl+space handler |
 | `determineRouting()` | `plugin/tui-integration/hooks.ts` | Shell vs agent routing |
 | `cwd sentinel` in bash | `src/session/prompt.ts` | Cwd tracking after cd |
-| `mode_toggle` keybind | `src/config/config.ts` | ctrl+space default |
-| `agent_cycle` keybind | `src/config/keybinds.ts` | shift+tab (NOT tab) |
-| Double left border | `component/prompt/index.tsx` | Row layout, not nested |
+| ctrl+space mode toggle | `packages/tui/src/component/prompt/index.tsx` (`prompt.mode.toggle` binding) | replaced `mode_toggle` keybind after 2026-07-07 TUI move |
+| `agent_cycle` keybind | `packages/tui/src/config/keybind.ts` | shift+tab (NOT tab) |
+| Double left border | `packages/tui/src/component/prompt/index.tsx` | Row layout, not nested |
 | `EventCwdUpdated` | `sdk/js/src/v2/gen/types.gen.ts` | SDK type for cwd event |
 | cwd in `path.*` field | `src/session/prompt.ts` | Shows cwd in messages |
 
@@ -357,3 +365,14 @@ For conflict-free or simple merges, this can be fully automated. Conflicted merg
 |------|------------------------|-----------|-------|
 | 2026-04-02 | 673 (cf7ca9b2f → 92e820fdc) | 28 files | Major Effect rewrite of prompt.ts |
 | 2026-04-28 | (QA only — no new merge) | — | LAC-163: found 3 regressions post-merge: missing double border, wrong Tab keybind, border height mismatch. Fixed in commits bde00fa30, 85faf49fc, 9d7ac27c1. Added this QA checklist. |
+| 2026-06-26 | 629 (catch-up) | — | PR #31 merged. |
+| 2026-06-30 | 68 | escalated → LAC-2496 | PR #32 opened; later superseded by PR #39. |
+| 2026-07-07 | 195 (→ v1.17.15) | prompt/index.tsx re-architecture | LAC-2556: merge completed on-branch; run died in API outage before PR. mode_toggle/handleModeToggleKey replaced by direct ctrl+space `prompt.mode.toggle` binding; TUI moved to `packages/tui/`. |
+| 2026-07-13 | 90 (→ v1.17.18) | 15 version bumps, TEAM_MEMBERS, 1 hunk in prompt/index.tsx | LAC-2739: consolidated PR #39 (06-30 + 07-07 + 07-13). Kept lash `shortenedWorkingDir` footer over upstream's session-directory display. Typecheck 30/30. |
+| 2026-07-20 | 153 (→ v1.18.3) | 15 version bumps, bun.lock | LAC-2865: merged into PR #39 branch (dev still awaiting PR #39 merge). Also merged origin/dev (PR #40 Windows deflake). No complex conflicts; invariants verified. |
+| 2026-07-27 | 167 (→ v1.18.7) | 15 version bumps, bun.lock | LAC-3102: built on LAC-2739 branch (PR #39 still open). Version conflicts auto-resolved (kept lash 1.7.x). Typecheck gate: 0 errors. No changes to prompt.ts/keybinds.ts/types.gen.ts. agent_cycle=shift+tab verified. |
+| 2026-08-04 | 132 (→ v1.18.13) | 15 version bumps, bun.lock | LAC-3206: continued on LAC-3102 branch (PR #42), which fully contains PR #39 → #39 superseded/closable. All conflicts standard (kept lash 1.7.13; bun.lock regenerated). Flagged complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybinds.ts) auto-merged clean — no escalation. agent_cycle=shift+tab verified. **Backlog risk: sync PRs (#39→#42) have not landed on dev since 07-13; escalate merge decision.** |
+| 2026-08-10 | 59 (→ v1.18.16) | 15 version bumps, bun.lock | LAC-3264: continued on LAC-3102 branch (PR #42, still open). Standard conflicts only (kept lash 1.7.13; bun.lock regenerated from clean base — delta was internal versions + upstream's new @ai-sdk/openai-compatible@2.0.41 patch entry). Complex files: prompt.ts got 1 upstream fix hunk (orphan detection via parentID), prompt/index.tsx got cursor-style config (#32295); keybind.ts/app.tsx/types.gen.ts untouched. All invariants verified; agent_cycle=shift+tab. Typecheck 30/30. **Backlog risk persists: PR #42 unmerged since 07-13 lineage.** |
+| 2026-08-17 | 62 (→ v1.18.18) | version bumps, bun.lock, beta.yml | LAC-3333: fresh branch from dev (PR #42 merged 2026-08-10). Standard conflicts only (kept lash 1.7.13; bun.lock regenerated from upstream base). Complex files: all 5 (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybinds.ts) auto-merged clean — no escalation. EventCwdUpdated in types.gen.ts ✓, agent_cycle=shift+tab ✓, getCwd() in prompt.ts ✓. Typecheck 30/30. PR #43. |
+| 2026-08-24 | 113 (→ v1.18.21) | 15 version bumps, bun.lock | LAC-3413: continued on LAC-3333 branch (PR #43 still open). Standard conflicts only (kept lash 1.7.13; bun.lock regenerated from upstream base). **Gotcha caught: `git checkout --ours` on packages/opencode/package.json dropped upstream's @ai-sdk/amazon-bedrock 4.0.158 + google-vertex 4.0.181 pin bumps — re-applied manually. When verifying version-only conflicts, diff merge-base→upstream per file; files reverted to ours vanish from `git diff --cached`.** Complex files: prompt.ts got 1 fix hunk (continue unknown finish responses #43892), types.gen.ts 2 lines (upgrade endpoint #44686) — both auto-merged clean, no escalation. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd() ✓. Typecheck 30/30. |
+| 2026-08-31 | 62 (→ v1.18.25) | 15 version bumps, bun.lock | LAC-3587: continued on LAC-3333 branch (PR #43 still open). Standard conflicts only — each package.json had a single version-line hunk (resolved in-place keeping lash 1.7.13, upstream dep changes auto-merged outside the hunk; no `checkout --ours`, so no pin-drop gotcha). bun.lock regenerated from upstream base; float check clean (only upstream's own 1.18.25 bumps + number-flow add / d3-geo removals). Complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybind.ts) untouched by upstream this week. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, detectNaturalLanguage ✓. Typecheck 30/30. **Backlog note: PR #43 now carries 3 weeks (08-17/08-24/08-31) awaiting merge by Lacy.** |

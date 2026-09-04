@@ -1,51 +1,37 @@
-import { BusEvent } from "@/bus/bus-event"
-import { InstanceState } from "@/effect"
-import { EffectBridge } from "@/effect"
-import type { InstanceContext } from "@/project/instance"
-import { SessionID, MessageID } from "@/session/schema"
-import { Effect, Layer, Context } from "effect"
-import z from "zod"
-import { Config } from "../config"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import path from "path"
+import { InstanceState } from "@/effect/instance-state"
+import { EffectBridge } from "@/effect/bridge"
+import type { InstanceContext } from "@/project/instance-context"
+import { Effect, Layer, Context, Schema } from "effect"
+import { Config } from "@/config/config"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
 type State = {
   commands: Record<string, Info>
 }
 
 export const Event = {
-  Executed: BusEvent.define(
-    "command.executed",
-    z.object({
-      name: z.string(),
-      sessionID: SessionID.zod,
-      arguments: z.string(),
-      messageID: MessageID.zod,
-    }),
-  ),
+  Executed: LegacyEvent.CommandExecuted,
 }
 
-export const Info = z
-  .object({
-    name: z.string(),
-    description: z.string().optional(),
-    agent: z.string().optional(),
-    model: z.string().optional(),
-    source: z.enum(["command", "mcp", "skill"]).optional(),
-    // workaround for zod not supporting async functions natively so we use getters
-    // https://zod.dev/v4/changelog?id=zfunction
-    template: z.promise(z.string()).or(z.string()),
-    subtask: z.boolean().optional(),
-    hints: z.array(z.string()),
-  })
-  .meta({
-    ref: "Command",
-  })
+export const Info = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+  agent: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  source: Schema.optional(Schema.Literals(["command", "mcp", "skill"])),
+  // Some command templates are lazy promises from MCP prompt resolution.
+  template: Schema.Unknown,
+  subtask: Schema.optional(Schema.Boolean),
+  hints: Schema.Array(Schema.String),
+}).annotate({ identifier: "Command" })
 
-// for some reason zod is inferring `string` for z.promise(z.string()).or(z.string()) so we have to manually override it
-export type Info = Omit<z.infer<typeof Info>, "template"> & { template: Promise<string> | string }
+export type Info = Omit<Schema.Schema.Type<typeof Info>, "template"> & { template: Promise<string> | string }
 
 export function hints(template: string) {
   const result: string[] = []
@@ -69,7 +55,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Command") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -147,12 +133,19 @@ export const layer = Layer.effect(
 
       for (const item of yield* skill.all()) {
         if (commands[item.name]) continue
+        const dir = item.location === "<built-in>" ? undefined : path.dirname(item.location)
         commands[item.name] = {
           name: item.name,
           description: item.description,
           source: "skill",
           get template() {
-            return item.content
+            if (!dir) return item.content
+            return [
+              item.content,
+              "",
+              `Base directory for this skill: ${dir}`,
+              "Relative paths in this skill (e.g., scripts/, references/) are relative to this base directory.",
+            ].join("\n")
           },
           hints: [],
         }
@@ -179,10 +172,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(Config.defaultLayer),
-  Layer.provide(MCP.defaultLayer),
-  Layer.provide(Skill.defaultLayer),
-)
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node, MCP.node, Skill.node] })
 
 export * as Command from "."
