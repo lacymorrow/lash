@@ -2,9 +2,9 @@ name: nix-eval
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, lash]
   pull_request:
-    branches: [dev]
+    branches: [dev, lash]
   workflow_dispatch:
 
 concurrency:
