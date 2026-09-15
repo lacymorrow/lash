@@ -11,3 +11,4 @@ tmp
 *.bun-build
 dist
 .turbo
+.wrangler/
