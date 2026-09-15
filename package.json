@@ -73,6 +73,7 @@
     "@solidjs/start@1.1.7": "patches/@solidjs%2Fstart@1.1.7.patch"
   },
   "overrides": {
+    "wrangler": "^4.59.1",
     "@types/bun": "catalog:",
     "@types/node": "catalog:"
   }
