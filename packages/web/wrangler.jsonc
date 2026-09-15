@@ -1,0 +1,12 @@
+{
+  // Read by @astrojs/cloudflare for the prerender worker it spins up during
+  // `astro build`. Without nodejs_compat that worker cannot resolve the node
+  // builtins that postcss and expressive-code pull in, and prerendering fails
+  // with `No such module "chunks/path"`.
+  //
+  // Deployment itself is configured by SST (infra/app.ts), not this file.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lash-web",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"]
+}
