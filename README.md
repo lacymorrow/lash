@@ -60,23 +60,27 @@ We keep the fork in sync with upstream (`git fetch upstream && git merge upstrea
 ### Installation
 
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
+# Homebrew (macOS and Linux)
+brew install lacymorrow/tap/lash
 
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+# npm (or bun/pnpm/yarn)
+npm i -g lashcode@latest
+
+# Install script
+curl -fsSL https://lash.lacy.sh/install | bash
 ```
 
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
+The install script puts the `lash` binary in `$HOME/.lash/bin` and adds it to your
+`PATH`. Override with `LASH_INSTALL_DIR`, pin a version with `--version`, and skip
+the shell config edit with `--no-modify-path`:
+
+```bash
+curl -fsSL https://lash.lacy.sh/install | bash -s -- --version 1.7.13
+LASH_INSTALL_DIR=/usr/local/bin curl -fsSL https://lash.lacy.sh/install | bash
+```
+
+Lash installs alongside OpenCode rather than over it: different binary name,
+different install directory.
 
 ### Desktop App (BETA)
 
