@@ -17,17 +17,14 @@ async function writeOutput(output: string) {
 }
 
 /** `OPENCODE_VERSION` wins so a caller can ship a minor or a major; otherwise patch bump. */
-async function resolveVersion() {
+async function resolveVersion(released: string | undefined) {
   const override = process.env["OPENCODE_VERSION"]
   if (override) return override
 
-  const [published, released] = await Promise.all([
-    fetch("https://registry.npmjs.org/lashcode/latest")
-      .then((res) => (res.ok ? res.json() : undefined))
-      .then((data: any) => data?.version as string | undefined)
-      .catch(() => undefined),
-    getLatestRelease().catch(() => undefined),
-  ])
+  const published = await fetch("https://registry.npmjs.org/lashcode/latest")
+    .then((res) => (res.ok ? res.json() : undefined))
+    .then((data: any) => data?.version as string | undefined)
+    .catch(() => undefined)
   console.log(`last release: npm ${published ?? "unknown"}, github ${released ?? "unknown"}`)
 
   const tags = await $`git tag --list`.text().then((text) => text.split("\n").map((line) => line.trim()))
@@ -41,7 +38,15 @@ if (branch !== "lash") {
   throw new Error(`Releases are cut from the lash branch. You are on ${branch || "a detached HEAD"}.`)
 }
 
-const version = await resolveVersion()
+// Fetched once and reused for both the version bump and the changelog range. This call hits
+// api.github.com unauthenticated, which runners rate limit, so treat a miss as "unknown" rather
+// than killing the release.
+const previous = await getLatestRelease().catch((e) => {
+  console.warn(`Could not read the newest GitHub release: ${e}`)
+  return undefined
+})
+
+const version = await resolveVersion(previous)
 // Script reads both of these at import time, so they have to be set before it loads.
 process.env["OPENCODE_VERSION"] = version
 process.env["OPENCODE_CHANNEL"] = "latest"
@@ -61,8 +66,9 @@ if (process.env["LASH_RELEASE_DRY_RUN"] === "true") {
   process.exit(0)
 }
 
-const previous = await getLatestRelease()
-const notes = await buildNotes(previous, "HEAD")
+// No previous release to diff against means no changelog, not a failed release.
+const notes = previous ? await buildNotes(previous, "HEAD") : []
+if (!previous) console.warn("Skipping the changelog: no previous release to compare against.")
 
 const pkgjsons = await Array.fromAsync(
   new Bun.Glob("**/package.json").scan({
