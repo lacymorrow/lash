@@ -2,6 +2,7 @@
 
 import { $ } from "bun"
 import { appendFile } from "fs/promises"
+import path from "path"
 import { buildNotes, getLatestRelease } from "./changelog-lash"
 import { verifyNpmAuth } from "../packages/opencode/script/npm-auth"
 import { nextVersion } from "../packages/opencode/script/release-version"
@@ -147,9 +148,14 @@ await publishModule.publishPackages(publishModule.publishQueue, "latest")
 
 // Homebrew last: it needs the release assets above, and a failure here must not undo the npm
 // publish. Pushing to lacymorrow/homebrew-tap is cross-repo, so Actions' GITHUB_TOKEN is not enough.
+// updateRegistries reads the archives through paths like ./dist/lashcode-linux-x64.tar.gz, so it has
+// to run from packages/opencode rather than from the root we chdir'd back to.
 try {
+  process.chdir(path.join(dir, "packages", "opencode"))
   await publishModule.updateRegistries(publishModule.lashBinaries)
+  process.chdir(dir)
 } catch (e) {
+  process.chdir(dir)
   console.error("Homebrew tap update failed. The GitHub release and the npm publish are done.")
   console.error("Set a HOMEBREW_TAP_TOKEN secret with write access to lacymorrow/homebrew-tap, then rerun.")
   throw e

@@ -37,10 +37,12 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
+      # --global, because the homebrew tap is a second clone and a repo-level identity would not
+      # reach it. Without this its "Update to v<version>" commit fails on an unknown author.
       - name: Setup git committer
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Release
         id: release
