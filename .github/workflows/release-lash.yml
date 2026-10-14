@@ -1,0 +1,70 @@
+name: release lash
+run-name: "release lash ${{ inputs.version && format('v{0}', inputs.version) || '(patch bump)' }}${{ inputs.dry_run && ' [dry run]' || '' }}"
+
+# Lash releases only. Everything inherited from upstream is gated to sst/opencode or
+# anomalyco/opencode and never runs here, which is why lashcode sat on npm 1.7.13 from
+# 2026-05-05 while GitHub releases moved on. See LAC-4453.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v. Leave blank to patch bump."
+        required: false
+        type: string
+      dry_run:
+        description: "Check the npm credential and the next version, then stop without publishing."
+        required: false
+        default: false
+        type: boolean
+
+concurrency: ${{ github.workflow }}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'lacymorrow/lash'
+    # build-lash.ts cross-compiles all eleven targets on this one runner, so no build matrix.
+    timeout-minutes: 90
+    steps:
+      # Releases are cut from lash, so pin the ref rather than trusting the dispatch branch.
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          ref: lash
+          fetch-depth: 0 # full history and tags: the changelog and version bump both need them
+
+      - uses: ./.github/actions/setup-bun
+
+      # --global, because the homebrew tap is a second clone and a repo-level identity would not
+      # reach it. Without this its "Update to v<version>" commit fails on an unknown author.
+      - name: Setup git committer
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release
+        id: release
+        run: bun run release
+        env:
+          OPENCODE_VERSION: ${{ inputs.version }}
+          LASH_RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+          # Granular automation token for lashcode. Bypasses 2FA, so no OTP prompt.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: false
+          # gh needs the repo token; the homebrew tap push is cross-repo and needs its own.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### lash release"
+            echo
+            echo "- version: \`${{ steps.release.outputs.version || 'not reached' }}\`"
+            echo "- tag: \`${{ steps.release.outputs.tag || 'not reached' }}\`"
+            echo "- release: https://github.com/lacymorrow/lash/releases/tag/${{ steps.release.outputs.tag }}"
+            echo "- npm: https://www.npmjs.com/package/lashcode"
+          } >> "$GITHUB_STEP_SUMMARY"
