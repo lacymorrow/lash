@@ -5,6 +5,7 @@ import { Script } from "@opencode-ai/script"
 import { fileURLToPath } from "url"
 import fs from "fs" // Import fs for patching
 import path from "path"
+import { configureNpmAuth, npmToken } from "./npm-auth"
 
 const publishQueue: string[] = [] // Queue for interactive publishing
 
@@ -126,15 +127,15 @@ if (shouldPublish) {
     // Inline logic here to keep it contained
     await updateRegistries(lashBinaries)
 
-    // Interactive NPM Publish
-    await publishWithInteractiveOtp(publishQueue, tags[0])
+    // NPM publish: unattended with NPM_TOKEN, interactive OTP without one
+    await publishPackages(publishQueue, tags[0])
   }
 }
 
 console.log("Release script finished successfully.")
 
 // --- Exports ---
-export { lashBinaries, publishQueue, updateRegistries, publishWithInteractiveOtp }
+export { lashBinaries, publishQueue, updateRegistries, publishPackages }
 
 if (import.meta.main) {
   process.exit(0)
@@ -142,10 +143,25 @@ if (import.meta.main) {
 
 // -------------------------------------------------------------------------
 
-async function publishWithInteractiveOtp(queue: string[], tag: string) {
-  console.log(`\n=== Interactive NPM Publish ===`)
+/**
+ * Publish everything in `queue`. With NPM_TOKEN set this runs unattended; without one it falls
+ * back to prompting for a 2FA code, which is the only way a local run on a 2FA account can work.
+ */
+async function publishPackages(queue: string[], tag: string) {
+  console.log(`\n=== NPM Publish ===`)
   console.log(`Pending packages to publish: ${queue.length}`)
 
+  if (npmToken) {
+    await configureNpmAuth()
+    await publishBatch(queue, tag)
+    if (queue.length > 0) {
+      throw new Error(`npm publish failed with ${queue.length} package(s) left unpublished`)
+    }
+    console.log(`Published ${tag} to npm.`)
+    return
+  }
+
+  console.log("No NPM_TOKEN set, falling back to interactive OTP.")
   while (queue.length > 0) {
     process.stdout.write(`\nEnter NPM OTP code (or empty to skip remaining): `)
     const otp = await new Promise<string>((resolve) => {
@@ -169,80 +185,93 @@ async function publishWithInteractiveOtp(queue: string[], tag: string) {
       break
     }
 
-    const currentBatch = [...queue] // Copy to iterate safely
-    for (const pkgPath of currentBatch) {
-      const pkgName = path.basename(pkgPath)
-      process.stdout.write(`Publishing ${pkgName}... `)
+    await publishBatch(queue, tag, otp)
+  }
+}
+
+/**
+ * Publish each package in `queue`, shifting it off the front on success so a retry or the next
+ * OTP round picks up where this one stopped. Returns with work left in `queue` on failure.
+ */
+async function publishBatch(queue: string[], tag: string, otp?: string) {
+  const otpArg = otp ? [`--otp=${otp}`] : []
+  const currentBatch = [...queue] // Copy to iterate safely
+  for (const pkgPath of currentBatch) {
+    const pkgName = path.basename(pkgPath)
+    process.stdout.write(`Publishing ${pkgName}... `)
+    try {
+      // Determine if it's a tarball or directory.
+      // We packed earlier, so there's a .tgz file. Find it.
+      const tgz = await new Bun.Glob("*.tgz")
+        .scan({ cwd: pkgPath, absolute: false })
+        .next()
+        .then((v) => v.value)
+
+      // Check if version already exists to be idempotent
       try {
-        // Determine if it's a tarball or directory.
-        // We packed earlier, so there's a .tgz file. Find it.
-        const tgz = await new Bun.Glob("*.tgz")
-          .scan({ cwd: pkgPath, absolute: false })
-          .next()
-          .then((v) => v.value)
+        // Inspect the tarball source of truth using tar (avoid npm view network/parsing issues)
+        // npm pack always puts content in 'package/'
+        const tarOutput = await $`tar -xOf ${tgz} package/package.json`.cwd(pkgPath).quiet().text()
+        const { name, version } = JSON.parse(tarOutput)
 
-        // Check if version already exists to be idempotent
-        try {
-          // Inspect the tarball source of truth using tar (avoid npm view network/parsing issues)
-          // npm pack always puts content in 'package/'
-          const tarOutput = await $`tar -xOf ${tgz} package/package.json`.cwd(pkgPath).quiet().text()
-          const { name, version } = JSON.parse(tarOutput)
+        console.log(`[Idempotency] Local artifact: ${name}@${version}`)
 
-          console.log(`[Idempotency] Local artifact: ${name}@${version}`)
+        const remoteVersionStr = await $`npm view ${name}@${version} version`
+          .quiet()
+          .text()
+          .catch((e) => {
+            // console.warn(`[Idempotency] npm view failed (code ${e.exitCode}): ${e.message}`)
+            return ""
+          })
+        const remoteVersion = remoteVersionStr.trim()
 
-          const remoteVersionStr = await $`npm view ${name}@${version} version`
-            .quiet()
-            .text()
-            .catch((e) => {
-              // console.warn(`[Idempotency] npm view failed (code ${e.exitCode}): ${e.message}`)
-              return ""
-            })
-          const remoteVersion = remoteVersionStr.trim()
+        if (remoteVersion === version) {
+          console.log(`  Artifact ${name}@${version} exists. Checking tags...`)
 
-          if (remoteVersion === version) {
-            console.log(`  Artifact ${name}@${version} exists. Checking tags...`)
-
-            // Check if 'latest' tag points to this version, if not promote it
-            if (tag === "latest") {
-              try {
-                const distTagsJson = await $`npm view ${name} dist-tags --json`.quiet().text()
-                const distTags = JSON.parse(distTagsJson)
-                if (distTags.latest !== version) {
-                  console.log(`  Promoting to 'latest' (currently ${distTags.latest})...`)
-                  await $`npm dist-tag add ${name}@${version} latest --otp=${otp}`.quiet()
-                  console.log("  ✅ Promoted")
-                } else {
-                  console.log(`  Already tagged as 'latest'.`)
-                }
-              } catch (err: any) {
-                console.warn(`  Failed to check/update tags: ${err.message}`)
+          // Check if 'latest' tag points to this version, if not promote it
+          if (tag === "latest") {
+            try {
+              const distTagsJson = await $`npm view ${name} dist-tags --json`.quiet().text()
+              const distTags = JSON.parse(distTagsJson)
+              if (distTags.latest !== version) {
+                console.log(`  Promoting to 'latest' (currently ${distTags.latest})...`)
+                await $`npm dist-tag add ${name}@${version} latest ${otpArg}`.quiet()
+                console.log("  ✅ Promoted")
+              } else {
+                console.log(`  Already tagged as 'latest'.`)
               }
+            } catch (err: any) {
+              console.warn(`  Failed to check/update tags: ${err.message}`)
             }
-
-            queue.shift()
-            continue
-          } else {
-            console.log(`[Idempotency] Not found on registry. Proceeding to publish.`)
           }
-        } catch (e: any) {
-          console.error("[Idempotency] Check crashed:", e.message)
-          // ignore, assume not published or error check will fail later
+
+          queue.shift()
+          continue
+        } else {
+          console.log(`[Idempotency] Not found on registry. Proceeding to publish.`)
         }
-
-        await $`npm publish ${tgz} --access public --tag ${tag} --otp=${otp}`.cwd(pkgPath).quiet()
-        console.log("✅")
-        // Remove from queue on success
-        queue.shift()
       } catch (e: any) {
-        console.log("❌ Failed")
-        console.log(`Message: ${e.message}`)
-        if (e.stdout) console.log(`Stdout: ${e.stdout.toString()}`)
-        if (e.stderr) console.log(`Stderr: ${e.stderr.toString()}`)
-
-        console.log("The OTP may have expired, or there is a permission/version issue.")
-        console.log("Stopping batch.")
-        break // Break inner loop to re-prompt or exit
+        console.error("[Idempotency] Check crashed:", e.message)
+        // ignore, assume not published or error check will fail later
       }
+
+      await $`npm publish ${tgz} --access public --tag ${tag} ${otpArg}`.cwd(pkgPath).quiet()
+      console.log("✅")
+      // Remove from queue on success
+      queue.shift()
+    } catch (e: any) {
+      console.log("❌ Failed")
+      console.log(`Message: ${e.message}`)
+      if (e.stdout) console.log(`Stdout: ${e.stdout.toString()}`)
+      if (e.stderr) console.log(`Stderr: ${e.stderr.toString()}`)
+
+      console.log(
+        otp
+          ? "The OTP may have expired, or there is a permission/version issue."
+          : "Check that NPM_TOKEN still has write permission on this package.",
+      )
+      console.log("Stopping batch.")
+      break // Leave the rest in the queue for the next OTP round or a rerun
     }
   }
 }
