@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { rmSync } from "fs"
 import os from "os"
 import path from "path"
 
@@ -23,10 +24,13 @@ let userconfig: string | undefined
 export async function configureNpmAuth() {
   if (!npmToken) return
   if (userconfig) return
-  userconfig = path.join(os.tmpdir(), `lash-npmrc-${process.pid}`)
-  await Bun.write(userconfig, `//${REGISTRY}/:_authToken=${npmToken}\n`)
-  await $`chmod 600 ${userconfig}`.nothrow().quiet()
-  process.env["npm_config_userconfig"] = userconfig
+  const file = path.join(os.tmpdir(), `lash-npmrc-${process.pid}`)
+  await Bun.write(file, `//${REGISTRY}/:_authToken=${npmToken}\n`)
+  await $`chmod 600 ${file}`.nothrow().quiet()
+  process.env["npm_config_userconfig"] = file
+  userconfig = file
+  // A CI runner is thrown away, but a laptop is not: don't leave the token sitting in tmp.
+  process.once("exit", () => rmSync(file, { force: true }))
 }
 
 /**
