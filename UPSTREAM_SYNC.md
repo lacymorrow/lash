@@ -6,7 +6,21 @@ Lash is a fork of [anomalyco/opencode](https://github.com/anomalyco/opencode). T
 
 - **Upstream remote**: `upstream` → `https://github.com/anomalyco/opencode.git`
 - **Target branch**: `lash` — **`lash` is the GitHub default and the working branch. Sync PRs, fixes, and releases target `lash`, never `dev`.** (`release-lash.ts` only force-releases on `lash`.) 2026-09-04: syncs through PR #43 had drifted onto `dev`; `dev` was merged back into `lash` at `aa19cdfb11` and `dev` is no longer a working branch.
-- **Merge target**: `upstream/dev`
+- **Merge source**: `upstream/v1`. **NOT `upstream/dev`.** See "Upstream split its lines" below before you merge anything.
+
+## Upstream split its lines (2026-10-10). READ THIS FIRST
+
+On 2026-10-10 upstream merged `5caf1f9f6f chore: promote v2 to dev`. `upstream/dev` is now OpenCode 2, and that merge **deleted `packages/opencode`** (commit `44b6938b2a`, 700 files, 328k deletions). Every lash customization lives in `packages/opencode`, so merging `upstream/dev` is no longer a weekly sync. It is re-porting the fork onto a new architecture.
+
+| | `upstream/dev` (OpenCode 2) | `upstream/v1` (maintenance) |
+|---|---|---|
+| commits since the 2026-10-05 merge base | 4735 | 53 |
+| conflicted files | 181 | 24 |
+| has `packages/opencode` | no | yes |
+
+Both branch from `907b3bc518`, the upstream commit the 2026-10-05 sync landed on. **Weekly syncs merge `upstream/v1`** until the fork-direction decision lands. Upstream treats v1 as terminal (they shipped `upgrade --major` for moving to OpenCode 2, and pinned v1 updates to 1.x via npm discovery), so this is a holding pattern, not the end state.
+
+Decision owner: **LAC-4864** (stay on v1 / port lash to OpenCode 2 / hard-fork). Do not let a weekly run attempt the v2 port by accident.
 
 ## Quick Sync (recurring)
 
@@ -15,7 +29,8 @@ Lash is a fork of [anomalyco/opencode](https://github.com/anomalyco/opencode). T
 git fetch upstream
 
 # 2. Merge (no fast-forward, no auto-commit so conflicts can be resolved)
-git merge upstream/dev --no-commit --no-ff
+#    Source is upstream/v1, not upstream/dev. See "Upstream split its lines" above.
+git merge upstream/v1 --no-commit --no-ff
 
 # 3. Resolve conflicts (see "Conflict Playbook" below)
 # ... fix files ...
@@ -25,7 +40,7 @@ bun install
 
 # 5. Stage and commit
 git add -A
-git commit -m "merge: bring upstream dev into lash"
+git commit -m "merge: bring upstream v1 into lash"
 ```
 
 ## Conflict Playbook
@@ -47,7 +62,7 @@ for f in packages/*/package.json sdks/vscode/package.json; do
 import re, sys
 content = open('$f').read()
 content = re.sub(
-  r'<<<<<<< HEAD\n  \"version\": \"(1\.7\.[^\"]+)\",\n.*?>>>>>>> upstream/dev\n',
+  r'<<<<<<< HEAD\n  \"version\": \"(1\.7\.[^\"]+)\",\n.*?>>>>>>> upstream/\w+\n',
   r'  \"version\": \"\1\",\n',
   content, flags=re.DOTALL
 )
@@ -251,14 +266,14 @@ Tab is handled in `onKeyDown` in `prompt/index.tsx` via `handleShellTabCompletio
 
 Instead, restore a clean base lockfile first, then install:
 ```bash
-git checkout HEAD -- bun.lock   # pre-merge lash lockfile (or upstream/dev -- bun.lock if theirs is closer)
-bun install                      # only resolves the actual package.json deltas
+git checkout upstream/v1 -- bun.lock   # upstream base (or HEAD -- bun.lock if ours is closer)
+bun install                            # only resolves the actual package.json deltas
 git add bun.lock
 ```
 
-Then verify nothing unexpected floated:
+Then verify nothing unexpected floated. Diff against the base you restored from, and drop the filters. A clean result is version lines only, with zero third-party package entries:
 ```bash
-git diff --cached bun.lock | grep -E '^[+-]' | grep -vE 'workspace:|1\.7\.' | head -50
+git diff upstream/v1 -- bun.lock | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | sort | uniq -c | sort -rn
 ```
 
 ---
@@ -379,4 +394,5 @@ For conflict-free or simple merges, this can be fully automated. Conflicted merg
 | 2026-09-21 | 47 (→ v1.18.31) | 18 version bumps, bun.lock | LAC-3962: continued on LAC-3879 branch (PR #46 still open). Merged origin/lash first (v1.7.14 release + install fix). Standard conflicts only — version-line hunks resolved in-place keeping lash 1.7.14 (no `checkout --ours`). bun.lock regenerated from upstream base; float check clean. @ai-sdk/togetherai 2.0.41→2.0.68 auto-merged, verified kept. Complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybind.ts) untouched by upstream. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, detectNaturalLanguage ✓. Typecheck 30/30. |
 | 2026-09-28 | 38 (→ v1.18.33) | 18 version bumps, bun.lock | LAC-4045: continued on LAC-3879 branch (PR #46 still open). Run was cancelled mid-merge 2026-09-28 and resumed 2026-10-04 from the on-disk merge state — nothing lost. Standard conflicts only; version-line hunks resolved in place keeping lash 1.7.14 (console/* 1.7.13), no `checkout --ours`. bun.lock regenerated from upstream base; float check clean (only our 19 internal workspace version lines differ from upstream's lockfile, zero third-party drift). Upstream dep changes verified present per LAC-3413: core gitlab-ai-provider 6.15.0→6.18.0 + open 11.0.4 added, opencode gitlab-ai-provider 6.15.0→6.18.0 + open 10.1.2 removed. Complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybind.ts/bash.ts) untouched by upstream this window. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, setCwd + cwd sentinel ✓, detectNaturalLanguage ✓, prompt.mode.toggle ✓. Typecheck 30/30. **Backlog note: PR #46 now carries 3 weeks (09-14/09-21/09-28) awaiting merge by Lacy.** |
 | 2026-10-05 | 39 (→ v1.18.34) | 18 version bumps, bun.lock, run-process.test.ts | LAC-4139: continued on LAC-3879 branch (PR #46 still open). Mostly stats/console/docs plus macOS code-signing + namespaced session-identity headers. Version-line hunks resolved in place keeping lash 1.7.14 (console/* 1.7.13), no `checkout --ours`. Per LAC-3413, verified upstream's S3-lake retirement landed: `./athena` export + `@aws-sdk/client-athena`/`-firehose` removed, `packages/stats/server` main renamed to `src/stat-sync.ts`. bun.lock regenerated from upstream base; float check clean (only our 19 internal workspace version lines, zero third-party drift). **New conflict class — `packages/opencode/test/cli/run/run-process.test.ts`**: both sides were independently fixing the same wall-clock flake in the #27371 regression test. Lash (LAC-2386) had widened the comment around the 30s budget and kept `cliIt.concurrent`; upstream switched it to `cliIt.live`, which serializes the test and removes the competing-spawn pressure at the root. Took upstream's `cliIt.live` and kept lash's observed `>15s` cold-start note as a warning against tightening the 30s budget. 13/13 tests in that file pass post-resolution. Complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybind.ts/bash.ts) untouched by upstream this window — no escalation. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, setCwd + cwd sentinel ✓, detectNaturalLanguage ✓, prompt.mode.toggle ✓. Typecheck 30/30. **Backlog note: PR #46 now carries 4 weeks (09-14/09-21/09-28/10-05) awaiting merge by Lacy.** |
+| 2026-10-19 | 53 from **`upstream/v1`** (to v1.19.3) | 18 version bumps, bun.lock, 3 workflow branch filters, `install`, `app.tsx` | LAC-4851: continued on LAC-3879 branch (PR #46 still open), covering the 10-12 and 10-19 windows (the 10-12 run, LAC-4267, died on a token limit before doing any work). **Merge source changed to `upstream/v1`**: upstream promoted v2 to `dev` on 2026-10-10 (`5caf1f9f6f`), deleting `packages/opencode` where every lash customization lives. Merging `dev` would be a fork re-port (4735 commits, 181 conflicts) not a sync, so the direction decision is escalated to **LAC-4864** and this week took the v1 maintenance line (53 commits, 24 conflicts) instead. Version lines resolved in place keeping lash 1.7.14 (console/\* 1.7.13), no `checkout --ours`. Per LAC-3413, verified upstream's dep bumps landed: `@ai-sdk/xai` 3.0.102→3.0.139 (plus the patch file rename) and `gitlab-ai-provider` 6.18.0→6.19.0 in both core and opencode. bun.lock regenerated from the `upstream/v1` base; float check clean (version lines only, zero third-party drift). Workflow branch filters kept `[dev, lash]` over upstream's retarget to `[v1]`. `app.tsx`: upstream's `UpdateNotificationProvider` (#54409) wrapped around lash's `ExecutionModeProvider`/`WorkingDirProvider` per playbook §8. **`install` needed real care**: upstream rewrote release discovery to gate OpenCode 1 vs 2, and the *non-conflicted* part of that hunk auto-merged a hard-coded `anomalyco/opencode` download URL into the lash installer, re-breaking what PR #48 had just fixed. Rejected upstream's 1-vs-2 gating (lash has no v2), kept lash's release source, and took upstream's asset-existence preflight (`curl -sIL "$url"` instead of checking the tag page) since lash has the same still-publishing race. Other complex files: `prompt.ts`/`prompt/index.tsx`/`keybind.ts`/`bash.ts` untouched by upstream; `types.gen.ts` + `home.tsx` auto-merged clean. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, setCwd + cwd sentinel ✓, detectNaturalLanguage ✓, prompt.mode.toggle ✓, showWorkingDirectory ✓, double-border row layout ✓. Typecheck 30/30. **Backlog note: PR #46 now carries 5 weeks awaiting merge by Lacy, and the v1/v2 split makes that drift more expensive.** |
 | 2026-08-31 | 62 (→ v1.18.25) | 15 version bumps, bun.lock | LAC-3587: continued on LAC-3333 branch (PR #43 still open). Standard conflicts only — each package.json had a single version-line hunk (resolved in-place keeping lash 1.7.13, upstream dep changes auto-merged outside the hunk; no `checkout --ours`, so no pin-drop gotcha). bun.lock regenerated from upstream base; float check clean (only upstream's own 1.18.25 bumps + number-flow add / d3-geo removals). Complex files (prompt.ts/app.tsx/prompt/index.tsx/types.gen.ts/keybind.ts) untouched by upstream this week. agent_cycle=shift+tab ✓, EventCwdUpdated ✓, getCwd(ctx.directory) ✓, detectNaturalLanguage ✓. Typecheck 30/30. **Backlog note: PR #43 now carries 3 weeks (08-17/08-24/08-31) awaiting merge by Lacy.** |
