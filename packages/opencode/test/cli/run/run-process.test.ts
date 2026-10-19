@@ -74,9 +74,11 @@ describe("opencode run (non-interactive subprocess)", () => {
   // waiting on a session.status === idle event that never arrived. The fix
   // makes the SDK call surface an error promptly so the process exits nonzero.
   // We assert nonzero exit AND wall-clock under the harness timeout — a hang
-  // would run to the 30s cutoff and fail the duration assertion. The budget
-  // must absorb cold CLI startup on loaded 2-core CI runners (observed >15s).
-  cliIt.concurrent(
+  // would expire the timeout and produce a different (signal-killed) failure.
+  // Keep competing CLI startups out of this wall-clock assertion on busy CI runners.
+  // Don't tighten the 30s budget either: cold CLI startup alone has been observed
+  // over 15s on loaded 2-core GitHub-hosted runners (LAC-2386).
+  cliIt.live(
     "exits nonzero promptly when the model is unknown (regression for #27371)",
     ({ opencode }) =>
       Effect.gen(function* () {
